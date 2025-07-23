@@ -1,5 +1,7 @@
 # Fixed
 
+Environment is listed in requirement.txt
+
 Remember fix the file path to yourself environment!!!
 
 ## 1. distutils bug

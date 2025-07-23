@@ -1,0 +1,84 @@
+absl-py @ file:///croot/absl-py_1714140470852/work
+aiohappyeyeballs @ file:///croot/aiohappyeyeballs_1725434011349/work
+aiohttp @ file:///croot/aiohttp_1725527756643/work
+aiosignal @ file:///tmp/build/80754af9/aiosignal_1637843061372/work
+async-timeout @ file:///croot/async-timeout_1703096998144/work
+attrs @ file:///croot/attrs_1729089401488/work
+blinker @ file:///croot/blinker_1696539051175/work
+Bottleneck @ file:///croot/bottleneck_1707864210935/work
+Brotli @ file:///croot/brotli-split_1714483155106/work
+cachetools @ file:///croot/cachetools_1713977085444/work
+certifi @ file:///croot/certifi_1725551672989/work/certifi
+cffi @ file:///croot/cffi_1726856441404/work
+charset-normalizer @ file:///croot/charset-normalizer_1721748349566/work
+click @ file:///croot/click_1698129812380/work
+cmake==4.0.3
+contourpy @ file:///opt/conda/conda-bld/contourpy_1663827406301/work
+cryptography @ file:///croot/cryptography_1724940562255/work
+cycler @ file:///tmp/build/80754af9/cycler_1637851556182/work
+filelock==3.16.1
+fonttools @ file:///croot/fonttools_1713551344105/work
+frozenlist @ file:///croot/frozenlist_1698702560391/work
+google-auth @ file:///croot/google-auth_1715111149956/work
+google-auth-oauthlib @ file:///opt/conda/conda-bld/google-auth-oauthlib_1660687784486/work
+grpcio @ file:///croot/grpc-split_1716834572340/work
+idna @ file:///croot/idna_1714398848350/work
+imageio==2.35.1
+importlib-metadata @ file:///croot/importlib_metadata-suite_1704813515092/work
+importlib_resources @ file:///croot/importlib_resources-suite_1720641103994/work
+# Editable install with no version control (isaacgym==1.0rc4)
+-e /home/unitree/Documents/11-kongfubot/isaacgym/python
+Jinja2==3.1.6
+kiwisolver @ file:///croot/kiwisolver_1672387140495/work
+-e git+https://github.com/OpenRobotLab/HoST.git@70bb580949a336a920833700e4b5dc3bf7fe87ce#egg=legged_gym&subdirectory=legged_gym
+lit==18.1.8
+Markdown @ file:///croot/markdown_1671541909495/work
+MarkupSafe @ file:///croot/markupsafe_1704205993651/work
+matplotlib @ file:///croot/matplotlib-suite_1693812469450/work
+mkl-fft @ file:///croot/mkl_fft_1695058164594/work
+mkl-random @ file:///croot/mkl_random_1695059800811/work
+mkl-service==2.4.0
+mpmath==1.3.0
+multidict @ file:///croot/multidict_1701096859099/work
+networkx==3.1
+ninja==1.11.1.4
+numexpr @ file:///croot/numexpr_1683221822650/work
+numpy @ file:///work/mkl/numpy_and_numpy_base_1682953417311/work
+oauthlib @ file:///croot/oauthlib_1679489621486/work
+packaging==25.0
+pandas @ file:///croot/pandas_1692289311655/work
+pillow @ file:///croot/pillow_1721059439630/work
+protobuf==4.25.3
+pyasn1 @ file:///Users/ktietz/demo/mc3/conda-bld/pyasn1_1629708007385/work
+pyasn1-modules==0.2.8
+pycparser @ file:///tmp/build/80754af9/pycparser_1636541352034/work
+PyJWT @ file:///croot/pyjwt_1715094751094/work
+pyOpenSSL @ file:///croot/pyopenssl_1723651579422/work
+pyparsing @ file:///opt/conda/conda-bld/pyparsing_1661452539315/work
+PySocks @ file:///tmp/build/80754af9/pysocks_1605305779399/work
+python-dateutil @ file:///croot/python-dateutil_1716495738603/work
+pytz @ file:///croot/pytz_1713974312559/work
+PyYAML==6.0.2
+requests @ file:///croot/requests_1721410876868/work
+requests-oauthlib @ file:///croot/requests-oauthlib_1720615017878/work
+rsa @ file:///tmp/build/80754af9/rsa_1614366226499/work
+-e git+https://github.com/OpenRobotLab/HoST.git@70bb580949a336a920833700e4b5dc3bf7fe87ce#egg=rsl_rl&subdirectory=rsl_rl
+scipy==1.10.1
+seaborn @ file:///croot/seaborn_1718302919398/work
+six @ file:///tmp/build/80754af9/six_1644875935023/work
+sympy==1.13.3
+tensorboard==2.14.0
+tensorboard-plugin-wit @ file:///home/builder/tkoch/workspace/tensorflow/tensorboard-plugin-wit_1658918494740/work/tensorboard_plugin_wit-1.8.1-py3-none-any.whl
+tensorboard_data_server @ file:///croot/tensorboard-data-server_1724172556187/work/tensorboard_data_server-0.7.0-py3-none-manylinux2014_x86_64.whl#sha256=7da966c3e116be7b4d44cd25a804e06f45fa6d4a1f03819052dd9cb3482b141a
+torch==2.0.1+cu118
+torchaudio==2.0.2+rocm5.4.2
+torchvision==0.15.2+cu118
+tqdm @ file:///croot/tqdm_1724853939799/work
+triton==2.0.0
+typing_extensions==4.13.2
+tzdata @ file:///croot/python-tzdata_1746123641790/work
+unicodedata2 @ file:///croot/unicodedata2_1713212950228/work
+urllib3 @ file:///croot/urllib3_1727769808118/work
+Werkzeug @ file:///croot/werkzeug_1716533313107/work
+yarl @ file:///croot/yarl_1725976495189/work
+zipp @ file:///croot/zipp_1729012354496/work
