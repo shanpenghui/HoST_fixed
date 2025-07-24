@@ -67,6 +67,25 @@ change the type
 def get_axis_params(value, axis_idx, x_value=0., dtype=np.float64, n_dims=3):
 ```
 
+# Tensorboard
+
+activate tensor board
+```shell
+cd legged_gym
+tensorboard --logdir=./logs --port=6006
+```
+
+open data board in browser(chrome eg.)
+
+```shell
+http://localhost:6006
+```
+
+<div align="center">
+  <img width="97%" src="./pics/tensorboard.png" alt="Tensor Board Data Show"/>
+</div>
+
+
 
 # HoST: Humanoid Standing-up Control
 
