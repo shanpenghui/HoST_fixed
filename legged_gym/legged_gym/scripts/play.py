@@ -33,6 +33,8 @@ def play(args):
     train_cfg.runner.resume = True
     ppo_runner, train_cfg = task_registry.make_alg_runner(env=env, env_cfg=env_cfg, name=args.task, args=args, train_cfg=train_cfg)
     policy = ppo_runner.get_inference_policy(device=env.device)
+    # 记得换成自己的文件路径
+    export_policy_as_jit(ppo_runner.alg.actor_critic,"logs/g1_ground/Jul23_23-08-11_test_g1/")
     
     logger = Logger(env.dt)
     for i in range(10*int(env.max_episode_length)):
