@@ -136,7 +136,7 @@ Stephen Brawner (brawner@gmail.com)
       upper="0.523"
       effort="140"
       velocity="25" />
-    <dynamics damping="0.0" friction="0.0" />
+    <dynamics damping="2.0" friction="0.5"/>
   </joint>
 
   <link
@@ -197,7 +197,7 @@ Stephen Brawner (brawner@gmail.com)
       upper="0.3"
       effort="140"
       velocity="25" />
-    <dynamics damping="0.0" friction="0.0" />
+    <dynamics damping="2.0" friction="0.5"/>
   </joint>
 
   <link
@@ -257,7 +257,7 @@ Stephen Brawner (brawner@gmail.com)
       upper="1.204"
       effort="140"
       velocity="25" />
-    <dynamics damping="0.0" friction="0.0" />
+    <dynamics damping="2.0" friction="0.5"/>
   </joint>
 
   <link
@@ -317,7 +317,7 @@ Stephen Brawner (brawner@gmail.com)
       upper="2.268"
       effort="140"
       velocity="25" />
-    <dynamics damping="0.0" friction="0.0" />
+    <dynamics damping="2.0" friction="0.5"/>
   </joint>
 
   <link
@@ -385,7 +385,7 @@ Stephen Brawner (brawner@gmail.com)
       upper="0.6"
       effort="24"
       velocity="31" />
-    <dynamics damping="0.0" friction="0.0" />
+    <dynamics damping="2.0" friction="0.5"/>
   </joint>
 
   <link
@@ -457,7 +457,7 @@ Stephen Brawner (brawner@gmail.com)
       upper="0.6"
       effort="24"
       velocity="31" />
-    <dynamics damping="0.0" friction="0.0" />
+    <dynamics damping="2.0" friction="0.5"/>
   </joint>
 
   <link
@@ -518,7 +518,7 @@ Stephen Brawner (brawner@gmail.com)
       upper="0.523"
       effort="140"
       velocity="25" />
-    <dynamics damping="0.0" friction="0.0" />
+    <dynamics damping="2.0" friction="0.5"/>
   </joint>
 
   <link
@@ -579,7 +579,7 @@ Stephen Brawner (brawner@gmail.com)
       upper="0.3"
       effort="140"
       velocity="25" />
-    <dynamics damping="0.0" friction="0.0" />
+    <dynamics damping="2.0" friction="0.5"/>
   </joint>
 
   <link
@@ -639,7 +639,7 @@ Stephen Brawner (brawner@gmail.com)
       upper="1.204"
       effort="140"
       velocity="25" />
-    <dynamics damping="0.0" friction="0.0" />
+    <dynamics damping="2.0" friction="0.5"/>
   </joint>
 
   <link
@@ -699,7 +699,7 @@ Stephen Brawner (brawner@gmail.com)
       upper="2.268"
       effort="140"
       velocity="25" />
-    <dynamics damping="0.0" friction="0.0" />
+    <dynamics damping="2.0" friction="0.5"/>
   </joint>
 
   <link
@@ -767,7 +767,7 @@ Stephen Brawner (brawner@gmail.com)
       upper="0.6"
       effort="24"
       velocity="31" />
-    <dynamics damping="0.0" friction="0.0" />
+    <dynamics damping="2.0" friction="0.5"/>
   </joint>
 
   <link
@@ -839,6 +839,6 @@ Stephen Brawner (brawner@gmail.com)
       upper="0.6"
       effort="24"
       velocity="31" />
-    <dynamics damping="0.0" friction="0.0" />
+    <dynamics damping="2.0" friction="0.5"/>
   </joint>
 </robot>

@@ -3,7 +3,7 @@ from legged_gym.envs.base.legged_robot_config import LeggedRobotCfg, LeggedRobot
 
 class ZqCfg( LeggedRobotCfg ):
     class init_state( LeggedRobotCfg.init_state ):
-        pos = [0.0, 0.0, 0.08]   # 参考宇树G1 # x,y,z [m], updated to match Piwaist
+        pos = [0.0, 0.0, 0.5]   # 参考宇树G1 # x,y,z [m], updated to match Piwaist
         rot = [0.0, -1, 0, 1.0] # x,y,z,w [quat]
         # ZQ robot:
         # leg_l1_joint: hip_roll

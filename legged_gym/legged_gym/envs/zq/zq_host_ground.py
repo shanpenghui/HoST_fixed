@@ -277,7 +277,13 @@ class LeggedRobot_Zq(BaseTask):
 
         for rg in self.reward_groups:
             idx = self.reward_groups.index(rg)
-            self.episode_sums[rg] = self.rew_buf[:, idx]
+            reward_column = self.rew_buf[:, idx]
+            self.episode_sums[rg] = reward_column
+
+            # 添加调试信息
+            if torch.any(torch.isnan(reward_column)) or torch.any(torch.isinf(reward_column)):
+                print(f"[DEBUG] rew_buf[:, {idx}] (reward group: '{rg}') has NaN or Inf.")
+                print(f"         max: {reward_column.max().item()}, min: {reward_column.min().item()}")
 
     def compute_observations(self):
         """ Computes observations
@@ -433,41 +439,31 @@ class LeggedRobot_Zq(BaseTask):
         self.gym.set_actor_root_state_tensor(self.sim, gymtorch.unwrap_tensor(self.root_states))
         # print('push_robots',self.root_states[:, 7:10])
     def _compute_torques(self, actions):
-        """ Compute torques from actions.
-            Actions can be interpreted as position or velocity targets given to a PD controller, or directly as scaled torques.
-            [NOTE]: torques must have the same dimension as the number of DOFs, even if some DOFs are not actuated.
+        """ Compute torques from actions. """
+        # 限制动作范围 [-1, 1]
+        actions = torch.clamp(actions, -1.0, 1.0)
 
-        Args:
-            actions (torch.Tensor): Actions
-
-        Returns:
-            [torch.Tensor]: Torques sent to the simulation
-        """
-        #pd controller
+        # 原本的动作缩放
         actions_scaled = actions * self.action_rescale
-        # print('actions_scaled',actions_scaled)
         self.joint_pos_target = self.dof_pos + actions_scaled
-        # self.cfg.domain_rand.delay=False
+
         if self.cfg.domain_rand.delay:
             self.delay_buffer = torch.concat((self.delay_buffer[1:], actions_scaled.unsqueeze(0)), dim=0)
             self.joint_pos_target = self.dof_pos + self.delay_buffer[self.delay_idx, torch.arange(len(self.delay_idx)), :]
-        else:
-            self.joint_pos_target = self.dof_pos + actions_scaled
-        # print('joint_pos_target',self.joint_pos_target)
+
         control_type = self.cfg.control.control_type
-        if control_type=="P":
-            torques = self.p_gains * self.Kp_factors * (self.joint_pos_target - self.dof_pos) - self.d_gains *  self.Kd_factors * self.dof_vel
-            # print('p_gains:',self.p_gains,'Kp_factors',self.Kp_factors,'joint_pos_target',self.joint_pos_target,'dof_pos',self.dof_pos,'d_gains',self.d_gains,'Kd_factors',self.Kd_factors,'dof_vel',self.dof_vel)
-        elif control_type=="V":
-            torques = self.p_gains*(actions_scaled - self.dof_vel) - self.d_gains*(self.dof_vel - self.last_dof_vel)/self.sim_params.dt
-        elif control_type=="T":
+        if control_type == "P":
+            torques = self.p_gains * self.Kp_factors * (self.joint_pos_target - self.dof_pos) \
+                      - self.d_gains * self.Kd_factors * self.dof_vel
+        elif control_type == "V":
+            torques = self.p_gains * (actions_scaled - self.dof_vel) \
+                      - self.d_gains * (self.dof_vel - self.last_dof_vel) / self.sim_params.dt
+        elif control_type == "T":
             torques = actions_scaled
         else:
             raise NameError(f"Unknown controller type: {control_type}")
-        # print('torques1',torques)
-        torques = self.motor_strength *  torques + self.actuation_offset
-        # print('torques',torques)
-        
+
+        torques = self.motor_strength * torques + self.actuation_offset
         return torch.clip(torques, -self.torque_limits, self.torque_limits)
 
     def _reset_dofs(self, env_ids):
@@ -1039,8 +1035,21 @@ class LeggedRobot_Zq(BaseTask):
 
     #-----------------------------regularization rewards-----------------------------
     def _reward_dof_acc(self):
-        # Penalize dof accelerations
-        return torch.sum(torch.square((self.last_dof_vel - self.dof_vel) / self.dt), dim=1)
+        acc = (self.last_dof_vel - self.dof_vel) / self.dt
+
+        # 限制 acc 范围，避免 reward 爆炸
+        acc = torch.clamp(acc, -1e3, 1e3)
+
+        reward = torch.sum(torch.square(acc), dim=1)
+
+        # 新增范围检查（绝对值大于 1e4）
+        if torch.any(torch.abs(acc) > 1e4):
+            print("[DEBUG] _reward_dof_acc abnormal acc detected")
+            print("        acc max:", acc.max().item(), "acc min:", acc.min().item())
+            print("        self.dof_vel max:", self.dof_vel.max().item(), "min:", self.dof_vel.min().item())
+            print("        self.last_dof_vel max:", self.last_dof_vel.max().item(), "min:", self.last_dof_vel.min().item())
+
+        return reward
 
     def _reward_action_rate(self):
         # Penalize changes in actions
