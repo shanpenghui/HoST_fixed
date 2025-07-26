@@ -36,3 +36,4 @@ task_registry.register( "g1_ground_prone", LeggedRobotGroundProne, G1CfgGroundPr
 task_registry.register( "h1_ground", LeggedRobotGround, H1CfgGround(), H1CfgPPOGround())
 
 task_registry.register( "pi_ground", LeggedRobot_Pi, PiCfgGround(), PiCfgPPOGround())
+# task_registry.register( "zq_ground", LeggedRobot_Zq, ZqCfgGround(), ZqCfgPPOGround())

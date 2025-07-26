@@ -85,6 +85,22 @@ http://localhost:6006
   <img width="97%" src="./pics/tensorboard.png" alt="Tensor Board Data Show"/>
 </div>
 
+# Deploy
+
+Remember to change the path.
+After the model trained, run 'play.py' to export the model as jit type.
+
+```shell
+python legged_gym/scripts/play.py --task g1_${terrain} --checkpoint_path ${/path/to/ckpt.pt} # [ground, platform, slope, wall]
+```
+
+Example.
+```shell
+cd legged_gym
+python legged_gym/scripts/play.py --task g1_ground --checkpoint_path logs/g1_ground/Jul23_23-08-11_test_g1/model_16500.pt
+
+python legged_gym/scripts/play.py --task g1_platform --checkpoint_path logs/g1_ground/Jul23_23-08-11_test_g1/model_8500.pt
+```
 
 
 # HoST: Humanoid Standing-up Control
