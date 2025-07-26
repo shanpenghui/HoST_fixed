@@ -21,40 +21,36 @@ class ZqCfg( LeggedRobotCfg ):
         # l_ankle_roll_joint: ankle_roll
         target_joint_angles = { # = target angles [rad] when action = 0.0
             # left leg (6 dof)
-            "leg_l3_joint": -0.0, #"l_hip_pitch_joint": -0.0,
-            "leg_l1_joint": 0.0, #"l_hip_roll_joint": 0.0,
-            #leg_l2_joint: hip_yaw
-            #leg_l4_joint: knee_pitch
-            #leg_l5_joint: ankle_pitch
-            #leg_l6_joint: ankle_roll
-            "leg_l2_joint": 0.0, #"l_thigh_joint": 0.0,#knee_yaw
-            "leg_l4_joint": 0.0, #"l_calf_joint": 0.0,#knee_pitch
-            "leg_l5_joint": -0.0, #"l_ankle_pitch_joint": -0.0,
-            "leg_l6_joint": 0, #"l_ankle_roll_joint": 0,
+            "leg_l1_joint": 0.0,  # "l_hip_roll_joint"
+            "leg_l2_joint": 0.0,  # hip_yaw -> "l_thigh_joint": knee_yaw
+            "leg_l3_joint": -0.0, # "l_hip_pitch_joint"
+            "leg_l4_joint": 0.0,  # "l_calf_joint": knee_pitch
+            "leg_l5_joint": -0.0, # "l_ankle_pitch_joint"
+            "leg_l6_joint": 0,    # "l_ankle_roll_joint"
             # right leg (6 dof)
-            "r_hip_pitch_joint": -0.0,
-            "r_hip_roll_joint": 0.0,
-            "r_thigh_joint": 0.0,
-            "r_calf_joint": 0.0,
-            "r_ankle_pitch_joint": -0.0,
-            "r_ankle_roll_joint": 0,
+            "leg_r1_joint": 0.0,  # "r_hip_roll_joint"
+            "leg_r2_joint": 0.0,  # hip_yaw -> "r_thigh_joint": knee_yaw
+            "leg_r3_joint": -0.0, # "r_hip_pitch_joint"
+            "leg_r4_joint": 0.0,  # "r_calf_joint": knee_pitch
+            "leg_r5_joint": -0.0, # "r_ankle_pitch_joint"
+            "leg_r6_joint": 0,    # "r_ankle_roll_joint"
         }
 
         default_joint_angles = {
             # left leg (6 dof)
-            "l_hip_pitch_joint": -0.0,
-            "l_hip_roll_joint": 0.0,
-            "l_thigh_joint": 0.0,
-            "l_calf_joint": 0.0,
-            "l_ankle_pitch_joint": -0.0,
-            "l_ankle_roll_joint": 0,
+            "leg_l1_joint": 0.0,
+            "leg_l2_joint": 0.0,
+            "leg_l3_joint": -0.24,
+            "leg_l4_joint": 0.48,
+            "leg_l5_joint": -0.24,
+            "leg_l6_joint": 0,
             # right leg (6 dof)
-            "r_hip_pitch_joint": -0.0,
-            "r_hip_roll_joint": 0.0,
-            "r_thigh_joint": 0.0,
-            "r_calf_joint": 0.0,
-            "r_ankle_pitch_joint": -0.0,
-            "r_ankle_roll_joint": 0,
+            "leg_r1_joint": 0.0,
+            "leg_r2_joint": 0.0,
+            "leg_r3_joint": -0.24,
+            "leg_r4_joint": 0.48,
+            "leg_r5_joint": -0.24,
+            "leg_r6_joint": 0,
         } 
 
     class env(LeggedRobotCfg.env):
@@ -69,26 +65,14 @@ class ZqCfg( LeggedRobotCfg ):
     class control( LeggedRobotCfg.control ):
         # PD Drive parameters:
         control_type = 'P'
-        stiffness = {
-            "hip_pitch": 30,
-            "hip_roll": 15,
-            "thigh": 15,
-            "calf": 30,
-            "ankle_pitch": 12,
-            "ankle_roll": 5,
-        }  # [N*m/rad]
-        damping = {
-            "hip_pitch": 0.2,
-            "hip_roll": 0.2,
-            "thigh": 0.2,
-            "calf": 0.2,
-            "ankle_pitch": 0.2,
-            "ankle_roll": 0.2,
-        }  # [N*m/rad]  # [N*m*s/rad]
+        stiffness = {'1_joint': 50, '2_joint': 50,'3_joint': 70,
+                     '4_joint': 70, '5_joint': 20, '6_joint': 20}
+        damping = {'1_joint': 5.0, '2_joint': 5.0,'3_joint': 7.0,
+                   '4_joint': 7.0, '5_joint': 2, '6_joint': 2}
         # action scale: target angle = actionRescale * action + cur_dof_pos
-        action_scale = 1#0.25#1
+        action_scale = 0.25 #1
         # decimation: Number of control action updates @ sim DT per policy DT
-        decimation = 4
+        decimation = 10
 
     class terrain:
         mesh_type = 'plane' # "heightfield" # none, plane, heightfield or trimesh
@@ -115,37 +99,37 @@ class ZqCfg( LeggedRobotCfg ):
         slope_treshold = 0.75 # slopes above this threshold will be corrected to vertical surfaces
 
     class asset( LeggedRobotCfg.asset ):
-        file = "{LEGGED_GYM_ROOT_DIR}/resources/robots/pi_12dof/urdf/pi_12dof_release_v1.urdf"
-        name = "Pi"
-        left_foot_name = "l_ankle_pitch"
-        right_foot_name = "r_ankle_pitch"
-        left_knee_name = 'l_calf'
-        right_knee_name = 'r_calf'
-        foot_name = "ankle_roll"
-        penalize_contacts_on = ['calf', 'hip']
-        terminate_after_contacts_on = []    #'torse'
+        file = "{LEGGED_GYM_ROOT_DIR}/resources/robots/zq_humanoid/urdf/zq_sa01.urdf"
+        name = "zqsa01"
+        left_foot_name = "leg_l6_link"
+        right_foot_name = "leg_r6_link"
+        left_knee_name = 'leg_l4_link'
+        right_knee_name = 'leg_r4_link'
+        foot_name = "6_link"
+        penalize_contacts_on = ['base_link']
+        terminate_after_contacts_on = ['base_link', "4_link"]
 
 
-        left_leg_joints = [ 'l_hip_pitch_joint', 'l_hip_roll_joint','l_thigh_joint', 'l_calf_joint', 'l_ankle_pitch_joint', 'l_ankle_roll_joint']
-        right_leg_joints = [  'r_hip_pitch_joint','r_hip_roll_joint', 'r_thigh_joint','r_calf_joint', 'r_ankle_pitch_joint', 'r_ankle_roll_joint']
+        left_leg_joints = [ 'leg_l1_joint', 'leg_l2_joint','leg_l3_joint', 'leg_l4_joint', 'leg_l5_joint', 'leg_l6_joint']
+        right_leg_joints = [  'leg_r1_joint','leg_r2_joint', 'leg_r3_joint','leg_r4_joint', 'leg_r5_joint', 'leg_r6_joint']
        
-        left_hip_joints = ['l_thigh_joint']
-        right_hip_joints = ['r_thigh_joint']
-        left_hip_roll_joints = ['l_hip_roll_joint']
-        right_hip_roll_joints = ['r_hip_roll_joint']    
-        left_hip_pitch_joints = ['l_hip_pitch_joint']
-        right_hip_pitch_joints = ['r_hip_pitch_joint']    
+        left_hip_joints = ['leg_l2_joint']
+        right_hip_joints = ['leg_r2_joint']
+        left_hip_roll_joints = ['leg_l1_joint']
+        right_hip_roll_joints = ['leg_r1_joint']
+        left_hip_pitch_joints = ['leg_l3_joint']
+        right_hip_pitch_joints = ['leg_r3_joint']
 
         
 
-        left_knee_joints = ['l_calf_joint']
-        right_knee_joints = ['r_calf_joint']    
+        left_knee_joints = ['leg_l4_joint']
+        right_knee_joints = ['leg_r4_joint']
 
         left_arm_joints = ['l_shoulder_pitch_joint', 'l_shoulder_roll_joint', 'l_shoulder_yaw_joint', 'l_elbow_joint', 'l_wrist_roll_joint']
         right_arm_joints = ['r_shoulder_pitch_joint', 'r_shoulder_roll_joint', 'r_shoulder_yaw_joint', 'r_elbow_joint', 'r_wrist_roll_joint']
         waist_joints = ["waist_yaw_joint"]
-        knee_joints = ['l_calf_joint', 'r_calf_joint']
-        ankle_joints = [ 'l_ankle_pitch_joint', 'l_ankle_roll_joint', 'r_ankle_pitch_joint', 'r_ankle_roll_joint']
+        knee_joints = ['leg_l4_joint', 'leg_r4_joint']
+        ankle_joints = [ 'leg_l5_joint', 'leg_l6_joint', 'leg_r5_joint', 'leg_r6_joint']
 
         keyframe_name = "keyframe"
         head_name = 'keyframe_head'
@@ -154,11 +138,11 @@ class ZqCfg( LeggedRobotCfg ):
         base_name = 'base_link'
 
       
-        left_lower_body_names = ['l_hip_pitch', 'l_ankle_roll', 'l_calf']
-        right_lower_body_names = ['r_hip_pitch', 'r_ankle_roll', 'r_calf']
+        left_lower_body_names = ['leg_l3', 'leg_l6', 'leg_l4']
+        right_lower_body_names = ['leg_r3', 'leg_r6', 'leg_r4']
 
-        left_ankle_names = ['l_ankle_roll']
-        right_ankle_names = ['r_ankle_roll']
+        left_ankle_names = ['leg_l6']
+        right_ankle_names = ['leg_r6']
 
         density = 0.001
         angular_damping = 0.01
@@ -173,18 +157,18 @@ class ZqCfg( LeggedRobotCfg ):
     class rewards( LeggedRobotCfg.rewards ):
         soft_dof_pos_limit = 0.9
         soft_dof_vel_limit = 0.9
-        base_height_target = 0.34  # updated to match Piwaist
+        base_height_target = 0.827  # updated to match ZQ
         only_positive_rewards = False # if true negative total rewards are clipped at zero (avoids early termination problems)
         orientation_sigma = 1
         is_gaussian = True
-        target_head_height = 0.37  # updated to match Piwaist head_height_target (base_height + 0.08)
-        target_head_margin = 0.37
-        target_base_height_phase1 = 0.25  # updated to match Piwaist
-        target_base_height_phase2 = 0.25 #0.05 updated to 0.05 to get better standing style
-        target_base_height_phase3 = 0.34  # updated to match Piwaist
+        target_head_height = 1  # 参考宇树G1 # updated to match ZQ head_height_target (base_height + 0.08)
+        target_head_margin = 1
+        target_base_height_phase1 = 0.45  # 参考宇树G1 第一个阶段的结束高度门槛（从完全趴倒→翻身）# updated to match Piwaist
+        target_base_height_phase2 = 0.45  # 参考宇树G1 多用于奖励逻辑复用 # 0.05 updated to 0.05 to get better standing style
+        target_base_height_phase3 = 0.65  # 参考宇树G1 第二阶段的结束门槛（从跪立→站立）# updated to match Piwaist
         orientation_threshold = 0.99
-        left_foot_displacement_sigma = -2#-200 updated to get better standing style
-        right_foot_displacement_sigma = -2#-200 updated to get better standing style
+        left_foot_displacement_sigma = -2  #-200 updated to get better standing style
+        right_foot_displacement_sigma = -2 #-200 updated to get better standing style
         target_dof_pos_sigma = -0.1
         tracking_sigma = 0.25 # tracking reward = exp(-error^2/sigma)
 
@@ -198,13 +182,13 @@ class ZqCfg( LeggedRobotCfg ):
 
     class constraints( LeggedRobotCfg.rewards ):
         is_gaussian = True
-        target_head_height = 0.37
-        target_head_margin = 0.37
+        target_head_height = 1
+        target_head_margin = 1
         orientation_height_threshold = 0.9
-        target_base_height = 0.34  # updated to match Piwaist
+        target_base_height = 0.45  # 参考宇树G1 # updated to match Piwaist
 
-        left_foot_displacement_sigma = -2#-200 updated to get better standing style
-        right_foot_displacement_sigma = -2#-200 updated to get better standing style
+        left_foot_displacement_sigma = -2  #-200 updated to get better standing style
+        right_foot_displacement_sigma = -2 #-200 updated to get better standing style
         hip_yaw_var_sigma = -2
         target_dof_pos_sigma = -0.1
         post_task = False
@@ -288,11 +272,15 @@ class ZqCfg( LeggedRobotCfg ):
     
     class curriculum:
         pull_force = True
-        force = 15 # 100*2=200 is the actuatl force because of a extra keyframe torso link
+        # vertical pulling force F 在训练初期，为了帮助机器人更容易探索起身动作，
+        # 在 base link 上向上施加一个垂直辅助力，模拟“托起”动作；随着训练进行，逐渐减小，最终为 0
+        # Unitree G1 的训练中用了 F = 200N 而代码中实际设置的是 force=100，是因为该项目结构中 力同时施加在两个 link 上（torso+base）→ 总力=100×2=200
+        # 如果代码结构是双 link 同时施力（如 torso + base），你应将 force 设置为总力一半（如 force = 50 → 实际 100N）
+        force = 150 # 100*2=200 is the actuatl force because of a extra keyframe torso link
         dof_vel_limit = 300
         base_vel_limit = 20
-        threshold_height = 0.37
-        no_orientation = False
+        threshold_height = 0.9 # 参考宇树G1
+        no_orientation = True  # 参考宇树G1
 
     class sim:
         dt =  0.005
@@ -314,7 +302,7 @@ class ZqCfg( LeggedRobotCfg ):
             contact_collection = 2 # 0: never, 1: last sub-step, 2: all sub-steps (default=2)
 
 
-class PiCfgPPO( LeggedRobotCfgPPO ):
+class ZqCfgPPO( LeggedRobotCfgPPO ):
     runner_class_name = 'OnPolicyRunner'
     class policy:
         init_noise_std = 0.8
@@ -330,7 +318,7 @@ class PiCfgPPO( LeggedRobotCfgPPO ):
     class runner( LeggedRobotCfgPPO.runner ):
         run_name = ''
         save_interval = 100 # check for potential saves every this many iterations
-        experiment_name = 'Pi_ground'
+        experiment_name = 'Zq_ground'
         algorithm_class_name = 'PPO'
         init_at_random_ep_len = True
-        max_iterations = 12000 # number of policy updates
+        max_iterations = 40000 # number of policy updates
