@@ -54,6 +54,30 @@ Stephen Brawner (brawner@gmail.com)
     </collision>
   </link>
 
+     <!-- Keyframe -->
+  	<link name="keyframe_head_link">
+  		<!-- <visual>
+  		<origin xyz="0 0 0" rpy="0 0 0"/>
+  		<geometry>
+  			<sphere radius="0.05"/>
+  		</geometry>
+  		</visual> -->
+  		<visual>
+  			<geometry>
+  			<!-- 定义几何形状，例如盒子 -->
+  			<box size="0.01 0.01 0.01"/>
+  			</geometry>
+  			<material name="white">
+  			<color rgba="1.7 0.7 0.7 1"/>
+  			</material>
+  		</visual>
+  	</link>
+  	<joint name="keyframe_head_joint" type="fixed" dont_collapse="true">
+  		<origin xyz="0 0 0.08" rpy="0 0 0"/>
+  		<parent link="base_link"/>
+  		<child link="keyframe_head_link"/>
+  	</joint>
+
   <link
     name="leg_l1_link">
     <inertial>

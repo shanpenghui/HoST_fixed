@@ -18,7 +18,7 @@ from legged_gym.utils.math import wrap_to_pi
 from legged_gym.utils.terrain import Terrain
 from legged_gym.utils.isaacgym_utils import get_euler_xyz as get_euler_xyz_in_tensor
 from legged_gym.utils.helpers import class_to_dict
-from .pi_config_ground import PiCfg
+from .zq_config_ground import ZqCfg
 
 from legged_gym.envs.g1.g1_utils import (
     MotionLib, 
@@ -43,8 +43,8 @@ from legged_gym.utils.math import (
 )
 
 
-class LeggedRobot_Pi(BaseTask):
-    def __init__(self, cfg: PiCfg, sim_params, physics_engine, sim_device, headless):
+class LeggedRobot_Zq(BaseTask):
+    def __init__(self, cfg: ZqCfg, sim_params, physics_engine, sim_device, headless):
         """ Parses the provided config file,
             calls create_sim() (which creates, simulation and environments),
             initilizes pytorch buffers used during training
@@ -253,6 +253,7 @@ class LeggedRobot_Pi(BaseTask):
             for i in range(len(self.reward_functions)):
                 name = self.reward_names[i]
                 rew = self.reward_functions[i]() * self.reward_scales[name]
+                # print(f"[DEBUG] Reward: {name}, shape: {rew.shape}, first 5: {rew[:5]}")
                 if len(rew.shape) == 2 and rew.shape[1] == 1:
                     rew = rew.squeeze(1)
                 self.rew_buf[:, task_group_index] *= rew # follow "Learning to Get Up"

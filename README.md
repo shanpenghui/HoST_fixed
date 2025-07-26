@@ -102,6 +102,13 @@ python legged_gym/scripts/play.py --task g1_ground --checkpoint_path logs/g1_gro
 python legged_gym/scripts/play.py --task g1_platform --checkpoint_path logs/g1_ground/Jul23_23-08-11_test_g1/model_8500.pt
 ```
 
+# 🧭 Extend HoST to Other Humanoid Robots: Zqsa01
+
+```bash
+python legged_gym/scripts/train.py --task zq_ground --run_name test_zq_ground
+```
+
+
 
 # HoST: Humanoid Standing-up Control
 

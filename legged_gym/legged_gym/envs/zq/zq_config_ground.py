@@ -3,7 +3,7 @@ from legged_gym.envs.base.legged_robot_config import LeggedRobotCfg, LeggedRobot
 
 class ZqCfg( LeggedRobotCfg ):
     class init_state( LeggedRobotCfg.init_state ):
-        pos = [0.0, 0.0, 0.351] # x,y,z [m], updated to match Piwaist
+        pos = [0.0, 0.0, 0.08]   # 参考宇树G1 # x,y,z [m], updated to match Piwaist
         rot = [0.0, -1, 0, 1.0] # x,y,z,w [quat]
         # ZQ robot:
         # leg_l1_joint: hip_roll
@@ -161,8 +161,8 @@ class ZqCfg( LeggedRobotCfg ):
         only_positive_rewards = False # if true negative total rewards are clipped at zero (avoids early termination problems)
         orientation_sigma = 1
         is_gaussian = True
-        target_head_height = 1  # 参考宇树G1 # updated to match ZQ head_height_target (base_height + 0.08)
-        target_head_margin = 1
+        target_head_height = 0.907  # 参考宇树G1 # updated to match ZQ head_height_target (base_height + 0.08)
+        target_head_margin = 0.907
         target_base_height_phase1 = 0.45  # 参考宇树G1 第一个阶段的结束高度门槛（从完全趴倒→翻身）# updated to match Piwaist
         target_base_height_phase2 = 0.45  # 参考宇树G1 多用于奖励逻辑复用 # 0.05 updated to 0.05 to get better standing style
         target_base_height_phase3 = 0.65  # 参考宇树G1 第二阶段的结束门槛（从跪立→站立）# updated to match Piwaist
@@ -178,12 +178,12 @@ class ZqCfg( LeggedRobotCfg ):
 
         class scales:
             task_orientation = 1
-            task_head_height = 1
+            task_head_height = 2 # 用于奖励机器人头部抬高到一定高度，防止头部着地，推动“抬头”动作形成
 
     class constraints( LeggedRobotCfg.rewards ):
         is_gaussian = True
-        target_head_height = 1
-        target_head_margin = 1
+        target_head_height = 0.907
+        target_head_margin = 0.907
         orientation_height_threshold = 0.9
         target_base_height = 0.45  # 参考宇树G1 # updated to match Piwaist
 
@@ -276,7 +276,7 @@ class ZqCfg( LeggedRobotCfg ):
         # 在 base link 上向上施加一个垂直辅助力，模拟“托起”动作；随着训练进行，逐渐减小，最终为 0
         # Unitree G1 的训练中用了 F = 200N 而代码中实际设置的是 force=100，是因为该项目结构中 力同时施加在两个 link 上（torso+base）→ 总力=100×2=200
         # 如果代码结构是双 link 同时施力（如 torso + base），你应将 force 设置为总力一半（如 force = 50 → 实际 100N）
-        force = 150 # 100*2=200 is the actuatl force because of a extra keyframe torso link
+        force = 200 # 100*2=200 is the actuatl force because of a extra keyframe torso link
         dof_vel_limit = 300
         base_vel_limit = 20
         threshold_height = 0.9 # 参考宇树G1
