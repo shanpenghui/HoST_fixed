@@ -57,27 +57,53 @@ class LeggedRobot_Zq(BaseTask):
             device_id (int): 0, 1, ...
             headless (bool): Run without rendering if True
         """
+        # 保存传入的配置、仿真参数
         self.cfg = cfg
         self.sim_params = sim_params
+        # 如果是 rough terrain 高度图测量，会在后面设置
         self.height_samples = None
+        # 是否启用调试可视化
         self.debug_viz = False
+        # 初始化完成标志，用于防止重复初始化
         self.init_done = False
+        # 解析配置参数。这个函数内部会从 cfg 中读取一些变量并赋值为类成员变量。
+        # 包括 reward scale、terminate 条件、控制参数等
         self._parse_cfg(self.cfg)
+        # 从配置中读取机器人关节自由度数量（如 12 DOFs for 四足或人形）
         self.num_real_dofs = cfg.env.num_dofs
 
+        # 调用父类（一般是 LeggedRobot) 的构造函数，完成仿真环境、机器人资源（URDF）、地形等创建。
+        # 内部会调用 create_sim() → 创建多个并行环境（envs）、加载机器人模型
         super().__init__(self.cfg, sim_params, physics_engine, sim_device, headless)
 
+        # 单步观测维度（如 base 速度 + 姿态 + 每个关节角/速/力 = 43）
         self.num_one_step_obs = self.cfg.env.num_one_step_observations #if not self.cfg.env.add_force else self.cfg.env.num_one_step_observations + 1
+        # 状态历史帧数（如 6），表示每一步将保留最近 6 帧观测用于时序信息输入
         self.actor_history_length = self.cfg.env.num_actor_history
+        # 整个输入 observation 的总维度（如 43 × 6 = 258）, 用于 LSTM/Transformer 等时序建模
         self.actor_proprioceptive_obs_length = self.num_one_step_obs * self.actor_history_length
 
+        # print(f"[INFO] num_one_step_obs = {self.num_one_step_obs}")
+        # print(f"[INFO] actor_history_length = {self.actor_history_length}")
+        # print(f"[INFO] actor_proprioceptive_obs_length = {self.actor_proprioceptive_obs_length}")
+
+        # 若不是 headless 模式（即带可视化 GUI），则设置摄像机位置与焦点
         if not self.headless:
             self.set_camera(self.cfg.viewer.pos, self.cfg.viewer.lookat)
+        # 初始化 PyTorch 张量缓冲区（如 reset_buf、episode_length_buf、contact_forces、obs_buf 等）。
+        # 这些 buffer 在每步 step() 中都会更新，是强化学习过程的核心数据结构。
         self._init_buffers()
+        # 初始化奖励函数，包括设置 reward name → index 的映射。
+        # 初始化每个 reward 的 scale，用于后续 reward 加权。
         self._prepare_reward_function()
         self.init_done = True
+        # unactuated_timesteps 表示前多少步不触发 base_vel 等 reset 条件，允许“自由落体”或无动作
         self.unactuated_time = self.cfg.env.unactuated_timesteps
+        # 乘以 0.02 / self.dt 是将 policy 的步数换算为仿真步数（因为通常每步动作会重复 decimation 次）。
+        # 其中 0.02 是 PPO 默认的 policy timestep（20ms），除以仿真 timestep 可得出实际 sim steps。
         self.unactuated_time *= 0.02 / self.dt
+        # 用于控制奖励/约束是否使用 Gaussian 形式
+        # 若为 True，某些 reward 项将使用 exp(-x^2 / sigma) 形式
         self.is_gaussian = cfg.rewards.is_gaussian
 
     def step(self, actions):
@@ -593,6 +619,7 @@ class LeggedRobot_Zq(BaseTask):
     #----------------------------------------
     def _init_buffers(self):
         """ Initialize torch tensors which will contain simulation states and processed quantities
+            初始化用于存储仿真状态和处理结果的 Torch 张量
         """
         # get gym GPU state tensors
         actor_root_state = self.gym.acquire_actor_root_state_tensor(self.sim)
@@ -1013,16 +1040,42 @@ class LeggedRobot_Zq(BaseTask):
         self.env_origins[:, 1] = spacing * yy.flatten()[:self.num_envs]
         self.env_origins[:, 2] = 0.
 
+    # 参数 cfg 是环境配置对象（如 ZqCfg），它包含控制参数、奖励函数设置、指令范围
     def _parse_cfg(self, cfg):
+        # self.sim_params.dt 是单步物理仿真的时间间隔（如 0.005s）
+        # self.cfg.control.decimation 是每个策略动作重复多少个 sim step
+        # print(f"[INFO] decimation = {self.cfg.control.decimation}, sim_dt = {self.sim_params.dt}, policy_dt = {self.dt}")
+        # [INFO] decimation = 10, sim_dt = 0.004999999888241291, policy_dt = 0.04999999888241291
+        # sim_dt = 0.005, 表示仿真时间频率 f = 1/0.005 = 200 Hz
+        # decimation = 10, 表示策略频率为仿真频率的 1/10, f' = 200/10 = 20 Hz, 也就是: 每 0.05 秒执行一次策略网络前向推理（action 输出）, 每输出一次 action，会连续执行 10 个仿真子步来应用该动作
         self.dt = self.cfg.control.decimation * self.sim_params.dt
+
+        # 保存观测值的归一化尺度（一般用于标准化 observation 中的位置、速度等）。
+        # 这有助于加速训练收敛并提升数值稳定性。
         self.obs_scales = self.cfg.normalization.obs_scales
+
+        # 将 cfg.rewards.scales 类结构转成字典。
+        # 每个奖励项都会有一个权重，这里把它们提取出来备用，便于在计算 reward 时逐项加权。
         self.reward_scales = class_to_dict(self.cfg.rewards.scales)
+
+        # 同样将 constraints 中的每项惩罚（软约束）项的权重也转为字典保存
         self.constraints_scales = class_to_dict(self.cfg.constraints.scales)
+
+        # 提取机器人控制任务中的指令范围，如目标速度、方向等上下限。
+        # 一般用于训练 phase 中的 random command sampling。
         self.command_ranges = class_to_dict(self.cfg.commands.ranges)
-     
+
+        # 环境最大 episode 时间（单位：秒），比如设定一次训练最多 10 秒
         self.max_episode_length_s = self.cfg.env.episode_length_s
+
+        # 将最大 episode 时间（秒）转换为最大步数（以策略步为单位）。
+        # 比如：如果 episode 长度为 10 秒，dt = 0.02 → 共 500 个 policy steps。
+        # np.ceil 向上取整，确保不会提前结束。
         self.max_episode_length = np.ceil(self.max_episode_length_s / self.dt)
 
+        # 把 curriculum 中**扰动间隔（单位：秒）**转换成策略步数单位。
+        # 也就是说每隔这么多步，就可能触发一次随机推力扰动。
+        # 举例：如果 push_interval_s = 10 秒、dt = 0.02 → 实际为每 500 步检查是否扰动。
         self.cfg.domain_rand.push_interval = np.ceil(self.cfg.domain_rand.push_interval_s / self.dt)
 
     def _draw_debug_vis(self):

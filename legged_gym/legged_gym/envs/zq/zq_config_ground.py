@@ -60,6 +60,11 @@ class ZqCfg( LeggedRobotCfg ):
         num_actor_history = 6
         num_observations = num_actor_history * num_one_step_observations
         episode_length_s = 10 # episode length in seconds
+
+        # 实际仿真步数是 50 × 0.02 / 0.005 = 200 步 = 1秒
+        # 0.02 是策略步时间（policy_dt = 20ms），self.dt 是仿真步时间（如 0.005s)
+        # 这两行代码确保 unactuated_timesteps 参数适配你当前设置的仿真频率（dt），
+        # 从而让“起身自由期”的逻辑与实际仿真步数对齐，避免因为高频仿真而提前终止。
         unactuated_timesteps = 50
 
     class control( LeggedRobotCfg.control ):
