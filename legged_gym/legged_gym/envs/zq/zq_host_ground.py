@@ -622,61 +622,116 @@ class LeggedRobot_Zq(BaseTask):
             初始化用于存储仿真状态和处理结果的 Torch 张量
         """
         # get gym GPU state tensors
+        # 获取所有 actor 的根状态（位置、姿态、线速度、角速度），shape = (num_actors, 13)
         actor_root_state = self.gym.acquire_actor_root_state_tensor(self.sim)
+        # 获取关节状态（角度、速度），shape = (num_dofs, 2)
         dof_state_tensor = self.gym.acquire_dof_state_tensor(self.sim)
+        # 获取每个刚体上的接触力（用于判断落地/支撑等信息）
         net_contact_forces = self.gym.acquire_net_contact_force_tensor(self.sim)
+        # 获取每个刚体的位置、旋转、速度等状态信息
         rigid_body_state = self.gym.acquire_rigid_body_state_tensor(self.sim)
+
+        # 刷新张量，使得值是最新的（注意这些是 PhysX 内部的数据）
         self.gym.refresh_dof_state_tensor(self.sim)
         self.gym.refresh_actor_root_state_tensor(self.sim)
         self.gym.refresh_net_contact_force_tensor(self.sim)
         self.gym.refresh_rigid_body_state_tensor(self.sim)
 
         # create some wrapper tensors for different slices
+        # 用 gymtorch.wrap_tensor 将原始 gym 张量包装成 torch.Tensor，便于计算
+        # 所有机器人 base 的状态信息
         self.root_states = gymtorch.wrap_tensor(actor_root_state)
+        # 所有关节的角度和速度
         self.dof_state = gymtorch.wrap_tensor(dof_state_tensor)
+        # 每个环境中每个刚体的状态
         self.rigid_body_states = gymtorch.wrap_tensor(rigid_body_state).view(self.num_envs, self.num_bodies, 13)
+        # 当前关节角度
         self.dof_pos = self.dof_state.view(self.num_envs, self.num_dof, 2)[..., 0]
+        # 当前关节角速度
         self.dof_vel = self.dof_state.view(self.num_envs, self.num_dof, 2)[..., 1]
+        # [角度, 速度] 二者合并
         self.dof_states = self.dof_state.view(self.num_envs, self.num_dof, 2)
+        # base 的四元数姿态
         self.base_quat = self.root_states[:, 3:7]
+        # 转换为欧拉角（roll, pitch, yaw）
         self.rpy = get_euler_xyz_in_tensor(self.base_quat)
+        # base 的位置（x, y, z）
         self.base_pos = self.root_states[:self.num_envs, 0:3]
+
+        # 每个刚体的 contact force（向量 xyz）
         self.contact_forces = gymtorch.wrap_tensor(net_contact_forces).view(self.num_envs, -1, 3) # shape: num_envs, num_bodies, xyz axis
+        # 足端位置
         self.feet_pos = self.rigid_body_states[:, self.feet_indices, 0:3]
+        # 足端姿态（四元数）
         self.feet_quat = self.rigid_body_states[:, self.feet_indices, 3:7]
+        # 足端速度
         self.feet_vel = self.rigid_body_states[:, self.feet_indices, 7:10]
 
         # initialize some data used later on
+        # 初始化其他关键缓存
+        # 当前 step 数，用于判断训练时间等
         self.common_step_counter = 0
+        # 存储额外信息供 PPO 等模块使用
         self.extras = {}
+        # 观测噪声大小因子，用于训练时加噪增强鲁棒性
         self.noise_scale_vec = self._get_noise_scale_vec(self.cfg)
+        # 重力向量
         self.gravity_vec = to_torch(get_axis_params(-1., self.up_axis_idx), device=self.device).repeat((self.num_envs, 1))
+        # 向前向量（X轴）
         self.forward_vec = to_torch([1., 0., 0.], device=self.device).repeat((self.num_envs, 1))
+
+        # 控制相关缓存
+        # 用于存储关节控制力
         self.torques = torch.zeros(self.num_envs, self.num_real_dofs, dtype=torch.float, device=self.device, requires_grad=False)
+        # 每个关节的 P 增益
         self.p_gains = torch.zeros(self.num_real_dofs, dtype=torch.float, device=self.device, requires_grad=False)
+        # 每个关节的 D 增益
         self.d_gains = torch.zeros(self.num_real_dofs, dtype=torch.float, device=self.device, requires_grad=False)
+        # 当前策略输出动作
         self.actions = torch.zeros(self.num_envs, self.num_actions, dtype=torch.float, device=self.device, requires_grad=False)
+        # 上一次策略动作
         self.last_actions = torch.zeros(self.num_envs, self.num_actions, dtype=torch.float, device=self.device, requires_grad=False)
+        # 上上次策略动作（用于正则化 smoothness）
         self.last_last_actions = torch.zeros(self.num_envs, self.num_actions, dtype=torch.float, device=self.device, requires_grad=False)
+        # 上一次的关节速度
         self.last_dof_vel = torch.zeros_like(self.dof_vel)
+        # 上一次 base 的速度信息
         self.last_root_vel = torch.zeros_like(self.root_states[:, 7:13])
+        # 上一次的关节位置
         self.last_dof_pos = torch.zeros_like(self.dof_pos)
+        # 上上次的关节位置
         self.last_last_dof_pos = torch.zeros_like(self.dof_pos)
+        # 控制指令（x vel, y vel, yaw vel）
         self.commands = torch.zeros(self.num_envs, self.cfg.commands.num_commands, dtype=torch.float, device=self.device, requires_grad=False) # x vel, y vel, yaw vel, heading
+        # 每项命令缩放因子
         self.commands_scale = torch.tensor([self.obs_scales.lin_vel, self.obs_scales.lin_vel, self.obs_scales.ang_vel], device=self.device, requires_grad=False,) # TODO change this
+        # 记录每只脚离地持续时间
         self.feet_air_time = torch.zeros(self.num_envs, self.feet_indices.shape[0], dtype=torch.float, device=self.device, requires_grad=False)
+        # 记录上一步是否接触地面
         self.last_contacts = torch.zeros(self.num_envs, len(self.feet_indices), dtype=torch.bool, device=self.device, requires_grad=False)
+
+        # 计算 base 的局部速度（四元数旋转到 robot local frame）
         self.base_lin_vel = quat_rotate_inverse(self.base_quat, self.root_states[:, 7:10])
         self.base_ang_vel = quat_rotate_inverse(self.base_quat, self.root_states[:, 10:13])
+        # 重力向量投影到 base local frame
         self.projected_gravity = quat_rotate_inverse(self.base_quat, self.gravity_vec)
+
+        # 记录头部上一时刻的高度（可用于 reward 中计算上升趋势）
         self.old_headheight = torch.zeros(self.num_envs, dtype=torch.float, device=self.device, requires_grad=False).unsqueeze(1)
+        # 记录历史最大头高
         self.max_headheight = torch.zeros(self.num_envs, dtype=torch.float, device=self.device, requires_grad=False).unsqueeze(1)
+        # 足部朝向，用于 reward 中判断落地时姿态
         self.feet_ori = torch.zeros(self.num_envs, dtype=torch.float, device=self.device, requires_grad=False).unsqueeze(1)
+
+        # curriculum 助力大小
         self.force = self.cfg.curriculum.force * torch.ones(self.num_envs, dtype=torch.float, device=self.device, requires_grad=False).unsqueeze(1)
+        # 动作缩放因子
         self.action_rescale = self.cfg.control.action_scale * torch.ones(self.num_envs, dtype=torch.float, device=self.device, requires_grad=False).unsqueeze(1)
+        # 用于模拟动作延迟的环形缓冲区
         self.delay_buffer = torch.zeros(self.cfg.domain_rand.max_delay_timesteps, self.num_envs, self.num_actions, dtype=torch.float, device=self.device, requires_grad=False)
-        
+
         # joint positions offsets and PD gains
+        # 设置每个关节的默认位置和目标位置（站立姿态）
         self.default_dof_pos = torch.zeros(self.num_dof, dtype=torch.float, device=self.device, requires_grad=False)
         self.target_dof_pos = torch.zeros(self.num_envs, self.num_dof, dtype=torch.float, device=self.device, requires_grad=False)
         for i in range(self.num_dofs):
@@ -685,7 +740,7 @@ class LeggedRobot_Zq(BaseTask):
             self.default_dof_pos[i] = angle
             self.target_dof_pos[:, i] = self.cfg.init_state.target_joint_angles[name]
             found = False
-            for dof_name in self.cfg.control.stiffness.keys():
+            for dof_name in self.cfg.control.stiffness.keys(): # 遍历查找是否指定了增益
                 if dof_name in name:
                     self.p_gains[i] = self.cfg.control.stiffness[dof_name] 
                     self.d_gains[i] = self.cfg.control.damping[dof_name]
@@ -695,31 +750,41 @@ class LeggedRobot_Zq(BaseTask):
                 self.d_gains[i] = 0.
                 if self.cfg.control.control_type in ["P", "V"]:
                     print(f"PD gain of joint {name} were not defined, setting them to zero")
+        # shape: (1, dof)
         self.default_dof_pos = self.default_dof_pos.unsqueeze(0)
 
         #randomize kp, kd, motor strength
+        # 随机化控制相关参数（domain randomization）
         self.Kp_factors = torch.ones(self.num_envs, self.num_dofs, dtype=torch.float, device=self.device, requires_grad=False)
         self.Kd_factors = torch.ones(self.num_envs, self.num_dofs, dtype=torch.float, device=self.device, requires_grad=False)
+        # actuation delay offset
         self.actuation_offset = torch.zeros(self.num_envs, self.num_dofs, dtype=torch.float, device=self.device, requires_grad=False)
+        # observation noise for height
         self.height_noise_offset = torch.zeros(self.num_envs, 1, dtype=torch.float, device=self.device, requires_grad=False)
+        # 电机强度
         self.motor_strength = torch.ones(self.num_envs, self.num_dofs, dtype=torch.float, device=self.device, requires_grad=False)
 
         if self.cfg.domain_rand.randomize_kp:
+            # 每个关节采样 Kp 随机因子
             self.Kp_factors = torch_rand_float(self.cfg.domain_rand.kp_range[0], self.cfg.domain_rand.kp_range[1], (self.num_envs, self.num_dofs), device=self.device)
         if self.cfg.domain_rand.randomize_kd:
+            # 每个关节采样 Kd 随机因子
             self.Kd_factors = torch_rand_float(self.cfg.domain_rand.kd_range[0], self.cfg.domain_rand.kd_range[1], (self.num_envs, self.num_dofs), device=self.device)
         if self.cfg.domain_rand.randomize_actuation_offset:
             self.actuation_offset = torch_rand_float(self.cfg.domain_rand.actuation_offset_range[0], self.cfg.domain_rand.actuation_offset_range[1], (self.num_envs, self.num_dof), device=self.device) * self.torque_limits.unsqueeze(0)
         if self.cfg.domain_rand.randomize_motor_strength:
             self.motor_strength = torch_rand_float(self.cfg.domain_rand.motor_strength_range[0], self.cfg.domain_rand.motor_strength_range[1], (self.num_envs, self.num_dofs), device=self.device)
         if self.cfg.domain_rand.randomize_payload_mass:
+            # 在 base 上加载不同 payload
             self.payload = torch_rand_float(self.cfg.domain_rand.payload_mass_range[0], self.cfg.domain_rand.payload_mass_range[1], (self.num_envs, 1), device=self.device)
         if self.cfg.domain_rand.randomize_com_displacement:
             self.com_displacement = torch_rand_float(self.cfg.domain_rand.com_displacement_range[0], self.cfg.domain_rand.com_displacement_range[1], (self.num_envs, 3), device=self.device)
+            # 放大位移量，增加扰动
             self.com_displacement[:, 0] = self.com_displacement[:, 0] * 4
             self.com_displacement[:, 1] = self.com_displacement[:, 1] * 4
             self.com_displacement[:, 2] = self.com_displacement[:, 2] * 2
         if self.cfg.domain_rand.delay:
+            # 每个环境设置不同的动作延迟 index（从 delay buffer 中取动作）
             self.delay_idx = torch.randint(low=0, high=self.cfg.domain_rand.max_delay_timesteps, size=(self.num_envs,), device=self.device)
 
     def _prepare_reward_function(self):
