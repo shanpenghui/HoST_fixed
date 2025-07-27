@@ -166,17 +166,34 @@ class LeggedRobot_Zq(BaseTask):
         self.last_dof_pos[:] = self.dof_pos[:]
 
     def check_termination(self):
-        """ Check if environments need to be reset
-        """
-        self.reset_buf = torch.any(torch.norm(self.contact_forces[:, self.termination_contact_indices, :], dim=-1) > 1., dim=1)
-        self.time_out_buf = self.episode_length_buf > self.max_episode_length 
+        """ Check if environments need to be reset """
+
+        # 1. 接触力过大：如摔倒触地
+        contact_force = torch.norm(self.contact_forces[:, self.termination_contact_indices, :], dim=-1)
+        contact_reset = torch.any(contact_force > 1., dim=1)
+        self.reset_buf = contact_reset
+        if contact_reset.any():
+            print("[TERMINATE] contact_force trigger", contact_force[contact_reset])
+
+        # 2. 时间超时
+        self.time_out_buf = self.episode_length_buf > self.max_episode_length
         self.reset_buf |= self.time_out_buf
+        if self.time_out_buf.any():
+            print("[TERMINATE] timeout trigger")
 
-        self.dof_vel_out = (torch.abs(self.dof_vel.max(dim=1).values) > self.cfg.curriculum.dof_vel_limit) & (self.real_episode_length_buf > self.unactuated_time)
+        # 3. DOF速度爆炸
+        max_dof_vel = torch.abs(self.dof_vel.max(dim=1).values)
+        self.dof_vel_out = (max_dof_vel > self.cfg.curriculum.dof_vel_limit) & (self.real_episode_length_buf > self.unactuated_time)
         self.reset_buf |= self.dof_vel_out
+        if self.dof_vel_out.any():
+            print(f"[TERMINATE] dof_vel trigger: max_dof_vel = {max_dof_vel[self.dof_vel_out]}")
 
-        self.base_vel_out = (torch.norm(self.base_lin_vel[:, :3], dim=-1) > self.cfg.curriculum.base_vel_limit) & (self.real_episode_length_buf > self.unactuated_time)
+        # 4. base速度过大（如掉下来冲击）
+        base_vel_norm = torch.norm(self.base_lin_vel[:, :3], dim=-1)
+        self.base_vel_out = (base_vel_norm > self.cfg.curriculum.base_vel_limit) & (self.real_episode_length_buf > self.unactuated_time)
         self.reset_buf |= self.base_vel_out
+        if self.base_vel_out.any():
+            print(f"[TERMINATE] base_vel trigger: base_vel_norm = {base_vel_norm[self.base_vel_out]}")
 
     def reset_idx(self, env_ids):
         """ Reset some environments.
@@ -310,13 +327,13 @@ class LeggedRobot_Zq(BaseTask):
                                 self.action_rescale + (torch.rand_like(self.action_rescale) - 0.5) * 0.05,
                                 ),dim=-1)
         # === 添加调试打印，不修改功能 ===
-        print("[DEBUG] base_ang_vel     range:", self.base_ang_vel.min().item(), "~", self.base_ang_vel.max().item())
-        print("[DEBUG] projected_gravity range:", self.projected_gravity.min().item(), "~", self.projected_gravity.max().item())
-        print("[DEBUG] dof_pos          range:", self.dof_pos.min().item(), "~", self.dof_pos.max().item())
-        print("[DEBUG] dof_vel          range:", self.dof_vel.min().item(), "~", self.dof_vel.max().item())
-        print("[DEBUG] actions          range:", self.actions.min().item(), "~", self.actions.max().item())
-        print("[DEBUG] action_rescale   range:", self.action_rescale.min().item(), "~", self.action_rescale.max().item())
-        print("[DEBUG] current_obs      range:", current_obs.min().item(), "~", current_obs.max().item())
+        # print("[DEBUG] base_ang_vel     range:", self.base_ang_vel.min().item(), "~", self.base_ang_vel.max().item())
+        # print("[DEBUG] projected_gravity range:", self.projected_gravity.min().item(), "~", self.projected_gravity.max().item())
+        # print("[DEBUG] dof_pos          range:", self.dof_pos.min().item(), "~", self.dof_pos.max().item())
+        # print("[DEBUG] dof_vel          range:", self.dof_vel.min().item(), "~", self.dof_vel.max().item())
+        # print("[DEBUG] actions          range:", self.actions.min().item(), "~", self.actions.max().item())
+        # print("[DEBUG] action_rescale   range:", self.action_rescale.min().item(), "~", self.action_rescale.max().item())
+        # print("[DEBUG] current_obs      range:", current_obs.min().item(), "~", current_obs.max().item())
 
         if self.add_noise:
             current_obs += (2 * torch.rand_like(current_obs) - 1) * self.noise_scale_vec
@@ -1074,11 +1091,11 @@ class LeggedRobot_Zq(BaseTask):
         reward = torch.sum(torch.square(acc), dim=1)
 
         # 新增范围检查（绝对值大于 1e4）
-        if torch.any(torch.abs(acc) > 1e4):
-            print("[DEBUG] _reward_dof_acc abnormal acc detected")
-            print("        acc max:", acc.max().item(), "acc min:", acc.min().item())
-            print("        self.dof_vel max:", self.dof_vel.max().item(), "min:", self.dof_vel.min().item())
-            print("        self.last_dof_vel max:", self.last_dof_vel.max().item(), "min:", self.last_dof_vel.min().item())
+        # if torch.any(torch.abs(acc) > 1e4):
+        #     print("[DEBUG] _reward_dof_acc abnormal acc detected")
+        #     print("        acc max:", acc.max().item(), "acc min:", acc.min().item())
+        #     print("        self.dof_vel max:", self.dof_vel.max().item(), "min:", self.dof_vel.min().item())
+        #     print("        self.last_dof_vel max:", self.last_dof_vel.max().item(), "min:", self.last_dof_vel.min().item())
 
         return reward
 
@@ -1143,7 +1160,7 @@ class LeggedRobot_Zq(BaseTask):
         mse_error = mse.clamp(0.3, np.inf)
         # mse_error = mse.clamp(0.025, np.inf) #better standing style
         # mse_error -=0.02 #better standing style
-        reward = torch.exp(mse_error * self.cfg.rewards.left_foot_displacement_sigma) *  (self.rigid_body_states[:, self.left_foot_indices, 2] < 0.15).squeeze(1)
+        reward = torch.exp(mse_error * self.cfg.rewards.left_foot_displacement_sigma) *  (self.rigid_body_states[:, self.left_foot_indices, 2] < 0.3).squeeze(1)
 
         standup  = self.root_states[:, 2] > self.cfg.rewards.target_base_height_phase3
         # standup  = self.root_states[:, 2] > self.cfg.rewards.target_base_height_phase2 #better standing style
@@ -1156,7 +1173,7 @@ class LeggedRobot_Zq(BaseTask):
         mse_error = mse.clamp(0.3, np.inf)
         # mse_error = mse.clamp(0.025, np.inf) #better standing style
         # mse_error -=0.02 #better standing style
-        reward = torch.exp(mse_error * self.cfg.rewards.right_foot_displacement_sigma) * (self.rigid_body_states[:, self.right_foot_indices, 2] < 0.15).squeeze(1)
+        reward = torch.exp(mse_error * self.cfg.rewards.right_foot_displacement_sigma) * (self.rigid_body_states[:, self.right_foot_indices, 2] < 0.3).squeeze(1)
 
         # standup  = self.root_states[:, 2] > self.cfg.rewards.target_base_height_phase2 #better standing style
         standup  = self.root_states[:, 2] > self.cfg.rewards.target_base_height_phase3
@@ -1164,7 +1181,7 @@ class LeggedRobot_Zq(BaseTask):
 
     def _reward_knee_deviation(self):
         hip_roll_dof = self.dof_pos[:, self.knee_joint_indices]
-        reward = (torch.max(torch.abs(self.dof_pos[:, self.knee_joint_indices]), dim=-1)[0] > 1.65) | (torch.min(self.dof_pos[:, self.knee_joint_indices], dim=-1)[0] < -0.6)
+        reward = (torch.max(torch.abs(self.dof_pos[:, self.knee_joint_indices]), dim=-1)[0] > 2.85) | (torch.min(self.dof_pos[:, self.knee_joint_indices], dim=-1)[0] < -0.06)
         return reward
 
     def _reward_shank_orientation(self):
@@ -1202,9 +1219,9 @@ class LeggedRobot_Zq(BaseTask):
         left_foot_pos = self.rigid_body_states[:, self.left_foot_indices, :3].clone()
         right_foot_pos = self.rigid_body_states[:, self.right_foot_indices, :3].clone()
         feet_distances = torch.norm(left_foot_pos - right_foot_pos, dim=-1)
-        reward = tolerance(feet_distances, [0, 0.4], 0.3, 0.05)
+        reward = tolerance(feet_distances, [0, 0.4], 0.38, 0.05)
         # return (feet_distances > 0.33).squeeze(1) #better standing style
-        return (feet_distances > 0.45).squeeze(1)
+        return (feet_distances > 0.9).squeeze(1)
 
 
     def _reward_style_ang_vel_xy(self):

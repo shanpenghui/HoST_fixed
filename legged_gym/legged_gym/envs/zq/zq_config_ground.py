@@ -3,7 +3,7 @@ from legged_gym.envs.base.legged_robot_config import LeggedRobotCfg, LeggedRobot
 
 class ZqCfg( LeggedRobotCfg ):
     class init_state( LeggedRobotCfg.init_state ):
-        pos = [0.0, 0.0, 0.5]   # 参考宇树G1 # x,y,z [m], updated to match Piwaist
+        pos = [0.0, 0.0, 0.35]   # 参考宇树G1 # x,y,z [m], updated to match Piwaist
         rot = [0.0, -1, 0, 1.0] # x,y,z,w [quat]
         # ZQ robot:
         # leg_l1_joint: hip_roll
@@ -60,7 +60,7 @@ class ZqCfg( LeggedRobotCfg ):
         num_actor_history = 6
         num_observations = num_actor_history * num_one_step_observations
         episode_length_s = 10 # episode length in seconds
-        unactuated_timesteps = 30
+        unactuated_timesteps = 50
 
     class control( LeggedRobotCfg.control ):
         # PD Drive parameters:
@@ -107,7 +107,7 @@ class ZqCfg( LeggedRobotCfg ):
         right_knee_name = 'leg_r4_link'
         foot_name = "6_link"
         penalize_contacts_on = ['base_link']
-        terminate_after_contacts_on = ['base_link', "4_link"]
+        terminate_after_contacts_on = []
 
 
         left_leg_joints = [ 'leg_l1_joint', 'leg_l2_joint','leg_l3_joint', 'leg_l4_joint', 'leg_l5_joint', 'leg_l6_joint']

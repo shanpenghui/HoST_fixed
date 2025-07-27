@@ -121,12 +121,12 @@ class OnPolicyRunner:
             # === Rollout 阶段（收集样本） ===
             with torch.inference_mode():
                 for i in range(self.num_steps_per_env):
-                    print("[DEBUG] obs range:", obs.min().item(), "~", obs.max().item())
-                    print("[DEBUG] critic_obs range:", critic_obs.min().item(), "~", critic_obs.max().item())
-                    print("[DEBUG] obs abs max:", torch.abs(obs).max().item())
+                    # print("[DEBUG] obs range:", obs.min().item(), "~", obs.max().item())
+                    # print("[DEBUG] critic_obs range:", critic_obs.min().item(), "~", critic_obs.max().item())
+                    # print("[DEBUG] obs abs max:", torch.abs(obs).max().item())
                     # 使用 actor 模型生成动作（动作是对 obs 的函数）
                     actions = self.alg.act(obs, critic_obs)
-                    print("[DEBUG] actions range:", actions.min().item(), "~", actions.max().item())  # 加在这里
+                    # print("[DEBUG] actions range:", actions.min().item(), "~", actions.max().item())  # 加在这里
                     # 用当前动作与环境交互，获取下一步状态、奖励、done 以及 info
                     obs, privileged_obs, rewards, dones, infos = self.env.step(actions)
                     # critic 仍优先使用特权观测
