@@ -96,13 +96,24 @@ class PPO:
     def train_mode(self):
         self.actor_critic.train()
 
+    # PPO 的“前向推理”函数，用于在 rollout 阶段根据观测生成策略输出。
     def act(self, obs, critic_obs):
+        # 如果使用的是 RNN/GRU（带有时间记忆的策略），就保存当前隐状态，以便下一个时刻使用。
+        # 通常机器人控制使用的是 非递归网络，这行可能不会被执行。
         if self.actor_critic.is_recurrent:
             self.transition.hidden_states = self.actor_critic.get_hidden_states()
         # Compute the actions and values
+        # 核心：使用策略网络根据观测 obs 输出一个动作向量
+        # .act(obs)：先经过 actor 网络，输出动作的分布（均值和方差）→ 从中采样动作
+        # .detach()：从计算图中分离出来，不影响梯度回传
         self.transition.actions = self.actor_critic.act(obs).detach()
+        # 使用 critic 网络（即 value function）根据 critic_obs 输出每个环境的状态价值估计。
+        # 注意：critic_obs 可以包含额外信息，比如环境“特权观测”或完整状态。
         self.transition.values = self.actor_critic.evaluate(critic_obs).detach()
+        # 计算当前策略下这些 actions 的对数概率：log π(at | st),用于后面 PPO 的策略更新。
         self.transition.actions_log_prob = self.actor_critic.get_actions_log_prob(self.transition.actions).detach()
+        # 保存当前策略的动作均值和标准差
+        # 如果动作爆炸（如你当前情况），可以从这两个值入手判断是不是 mean/std 输出异常
         self.transition.action_mean = self.actor_critic.action_mean.detach()
         self.transition.action_sigma = self.actor_critic.action_std.detach()
         # need to record obs and critic_obs before env.step()
