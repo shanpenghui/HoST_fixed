@@ -23,16 +23,16 @@ class ZqCfg( LeggedRobotCfg ):
             # left leg (6 dof)
             "leg_l1_joint": 0.0,  # "l_hip_roll_joint"
             "leg_l2_joint": 0.0,  # hip_yaw -> "l_thigh_joint": knee_yaw
-            "leg_l3_joint": -0.0, # "l_hip_pitch_joint"
-            "leg_l4_joint": 0.0,  # "l_calf_joint": knee_pitch
-            "leg_l5_joint": -0.0, # "l_ankle_pitch_joint"
+            "leg_l3_joint": -0.24, # "l_hip_pitch_joint"
+            "leg_l4_joint": 0.48,  # "l_calf_joint": knee_pitch
+            "leg_l5_joint": -0.24, # "l_ankle_pitch_joint"
             "leg_l6_joint": 0,    # "l_ankle_roll_joint"
             # right leg (6 dof)
             "leg_r1_joint": 0.0,  # "r_hip_roll_joint"
             "leg_r2_joint": 0.0,  # hip_yaw -> "r_thigh_joint": knee_yaw
-            "leg_r3_joint": -0.0, # "r_hip_pitch_joint"
-            "leg_r4_joint": 0.0,  # "r_calf_joint": knee_pitch
-            "leg_r5_joint": -0.0, # "r_ankle_pitch_joint"
+            "leg_r3_joint": -0.24, # "r_hip_pitch_joint"
+            "leg_r4_joint": 0.48,  # "r_calf_joint": knee_pitch
+            "leg_r5_joint": -0.24, # "r_ankle_pitch_joint"
             "leg_r6_joint": 0,    # "r_ankle_roll_joint"
         }
 

@@ -244,46 +244,59 @@ class LeggedRobot_Zq(BaseTask):
             Calls each reward function which had a non-zero scale (processed in self._prepare_reward_function())
             adds each terms to the episode sums and to the total reward
         """
+        # 如果不是 Gaussian 风格的 reward 聚合方式，暂不支持
         if not self.is_gaussian:
             raise NotImplementedError
         else:
+            # 初始化 rew_buf 全为 0（每个 reward group 的总和）
             self.rew_buf[:, :] = 0
+            # 找到 'task' 所在 reward group 的索引（乘积聚合放在 task reward 中）
             task_group_index = self.reward_groups.index('task')
+            # 将 task reward 的初始值设为 1，便于之后逐项乘法
             self.rew_buf[:, task_group_index] = 1
+            # 遍历所有启用的 reward function
             for i in range(len(self.reward_functions)):
+                # 当前 reward 的名字（如 head_height）
                 name = self.reward_names[i]
+                # 调用 reward 函数并乘以对应的权重
                 rew = self.reward_functions[i]() * self.reward_scales[name]
-                # print(f"[DEBUG] Reward: {name}, shape: {rew.shape}, first 5: {rew[:5]}")
+                # 如果返回的是 shape = [n, 1]，就 squeeze 到 shape = [n]
                 if len(rew.shape) == 2 and rew.shape[1] == 1:
                     rew = rew.squeeze(1)
+                # 乘法聚合：与当前 task reward 相乘（Gaussian 聚合方式）
+                # 参考论文 Learning to Get Up: "product of reward terms"
                 self.rew_buf[:, task_group_index] *= rew # follow "Learning to Get Up"
+                # 保存当前 reward 项的累计值（用于 TensorBoard 分析）
                 self.episode_sums[name] += rew
 
+        # 处理所有约束项（如 smoothness、joint limit 等），用于正则项 reward
         for i in range(len(self.constraints)):
+            # 当前正则项的名称
             name = self.constraint_names[i]
+            # 将其划归对应 reward group，如 'regu'、'style'
             reward_group_name = name.split('_')[0]
+            # 计算该约束 reward 并缩放
             rew = self.constraints[i]() * self.constraints_scales[name]
+            # 找到对应 reward group 的索引
             task_group_index = self.reward_groups.index(reward_group_name)
 
+            # 加和（正则项 reward 多为负值，采用加法聚合）
             self.rew_buf[:, task_group_index] += rew
             self.episode_sums[name] += rew
+            # 如果开启了 only_positive_rewards，则 clip 正则项 reward 到最小为0（避免 reward 为负）
             if self.cfg.constraints.only_positive_rewards:
                 self.rew_buf[:, task_group_index] = torch.clip(self.rew_buf[:, task_group_index], min=0.)
 
+        # 若 constraints 中包含 'termination' 项，单独处理终止惩罚（通常为负值）
         if "termination" in self.constraints_scales:
             rew = self._reward_termination() * self.constraints_scales["termination"]
             self.rew_buf += rew
             self.episode_sums["termination"] += rew
 
+        # 每个 reward group 的最终值，累加到 episode_sums 中（用于 TensorBoard）
         for rg in self.reward_groups:
             idx = self.reward_groups.index(rg)
-            reward_column = self.rew_buf[:, idx]
-            self.episode_sums[rg] = reward_column
-
-            # 添加调试信息
-            if torch.any(torch.isnan(reward_column)) or torch.any(torch.isinf(reward_column)):
-                print(f"[DEBUG] rew_buf[:, {idx}] (reward group: '{rg}') has NaN or Inf.")
-                print(f"         max: {reward_column.max().item()}, min: {reward_column.min().item()}")
+            self.episode_sums[rg] = self.rew_buf[:, idx]
 
     def compute_observations(self):
         """ Computes observations
@@ -296,7 +309,15 @@ class LeggedRobot_Zq(BaseTask):
                                 self.actions,
                                 self.action_rescale + (torch.rand_like(self.action_rescale) - 0.5) * 0.05,
                                 ),dim=-1)
-        
+        # === 添加调试打印，不修改功能 ===
+        print("[DEBUG] base_ang_vel     range:", self.base_ang_vel.min().item(), "~", self.base_ang_vel.max().item())
+        print("[DEBUG] projected_gravity range:", self.projected_gravity.min().item(), "~", self.projected_gravity.max().item())
+        print("[DEBUG] dof_pos          range:", self.dof_pos.min().item(), "~", self.dof_pos.max().item())
+        print("[DEBUG] dof_vel          range:", self.dof_vel.min().item(), "~", self.dof_vel.max().item())
+        print("[DEBUG] actions          range:", self.actions.min().item(), "~", self.actions.max().item())
+        print("[DEBUG] action_rescale   range:", self.action_rescale.min().item(), "~", self.action_rescale.max().item())
+        print("[DEBUG] current_obs      range:", current_obs.min().item(), "~", current_obs.max().item())
+
         if self.add_noise:
             current_obs += (2 * torch.rand_like(current_obs) - 1) * self.noise_scale_vec
 
@@ -439,31 +460,41 @@ class LeggedRobot_Zq(BaseTask):
         self.gym.set_actor_root_state_tensor(self.sim, gymtorch.unwrap_tensor(self.root_states))
         # print('push_robots',self.root_states[:, 7:10])
     def _compute_torques(self, actions):
-        """ Compute torques from actions. """
-        # 限制动作范围 [-1, 1]
-        actions = torch.clamp(actions, -1.0, 1.0)
+        """ Compute torques from actions.
+            Actions can be interpreted as position or velocity targets given to a PD controller, or directly as scaled torques.
+            [NOTE]: torques must have the same dimension as the number of DOFs, even if some DOFs are not actuated.
 
-        # 原本的动作缩放
+        Args:
+            actions (torch.Tensor): Actions
+
+        Returns:
+            [torch.Tensor]: Torques sent to the simulation
+        """
+        #pd controller
         actions_scaled = actions * self.action_rescale
+        # print('actions_scaled',actions_scaled)
         self.joint_pos_target = self.dof_pos + actions_scaled
-
+        # self.cfg.domain_rand.delay=False
         if self.cfg.domain_rand.delay:
             self.delay_buffer = torch.concat((self.delay_buffer[1:], actions_scaled.unsqueeze(0)), dim=0)
             self.joint_pos_target = self.dof_pos + self.delay_buffer[self.delay_idx, torch.arange(len(self.delay_idx)), :]
-
+        else:
+            self.joint_pos_target = self.dof_pos + actions_scaled
+        # print('joint_pos_target',self.joint_pos_target)
         control_type = self.cfg.control.control_type
-        if control_type == "P":
-            torques = self.p_gains * self.Kp_factors * (self.joint_pos_target - self.dof_pos) \
-                      - self.d_gains * self.Kd_factors * self.dof_vel
-        elif control_type == "V":
-            torques = self.p_gains * (actions_scaled - self.dof_vel) \
-                      - self.d_gains * (self.dof_vel - self.last_dof_vel) / self.sim_params.dt
-        elif control_type == "T":
+        if control_type=="P":
+            torques = self.p_gains * self.Kp_factors * (self.joint_pos_target - self.dof_pos) - self.d_gains *  self.Kd_factors * self.dof_vel
+            # print('p_gains:',self.p_gains,'Kp_factors',self.Kp_factors,'joint_pos_target',self.joint_pos_target,'dof_pos',self.dof_pos,'d_gains',self.d_gains,'Kd_factors',self.Kd_factors,'dof_vel',self.dof_vel)
+        elif control_type=="V":
+            torques = self.p_gains*(actions_scaled - self.dof_vel) - self.d_gains*(self.dof_vel - self.last_dof_vel)/self.sim_params.dt
+        elif control_type=="T":
             torques = actions_scaled
         else:
             raise NameError(f"Unknown controller type: {control_type}")
+        # print('torques1',torques)
+        torques = self.motor_strength *  torques + self.actuation_offset
+        # print('torques',torques)
 
-        torques = self.motor_strength * torques + self.actuation_offset
         return torch.clip(torques, -self.torque_limits, self.torque_limits)
 
     def _reset_dofs(self, env_ids):
@@ -1038,7 +1069,7 @@ class LeggedRobot_Zq(BaseTask):
         acc = (self.last_dof_vel - self.dof_vel) / self.dt
 
         # 限制 acc 范围，避免 reward 爆炸
-        acc = torch.clamp(acc, -1e3, 1e3)
+        # acc = torch.clamp(acc, -1e3, 1e3)
 
         reward = torch.sum(torch.square(acc), dim=1)
 

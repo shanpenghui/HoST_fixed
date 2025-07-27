@@ -85,33 +85,55 @@ class OnPolicyRunner:
         _, _ = self.env.reset()
     
     def learn(self, num_learning_iterations, init_at_random_ep_len=False):
-        # initialize writer
+        # 若尚未创建 tensorboard 日志 writer，且设置了日志路径，则创建 SummaryWriter
         if self.log_dir is not None and self.writer is None:
             self.writer = SummaryWriter(log_dir=self.log_dir, flush_secs=10)
+        # 若启用随机初始化 episode 长度（用于去同步环境状态），则对每个环境初始化为 [0, max) 范围的随机 episode 长度
         if init_at_random_ep_len:
             self.env.episode_length_buf = torch.randint_like(self.env.episode_length_buf, high=int(self.env.max_episode_length))
+        # 获取 actor 用的观测（通常是 proprioceptive 数据）
         obs = self.env.get_observations()
+        # 获取 critic 用的 privileged 观测（例如包括目标、地图等信息）
         privileged_obs = self.env.get_privileged_observations()
+        # 若没有特权观测，则 critic 使用普通观测
         critic_obs = privileged_obs if privileged_obs is not None else obs
+        # 将观测数据移到训练设备（GPU）
         obs, critic_obs = obs.to(self.device), critic_obs.to(self.device)
+        # 将 actor-critic 模型切换为训练模式（启用 dropout、batchnorm 等）
         self.alg.actor_critic.train() # switch to train mode (for dropout for example)
 
+        # 初始化 episode 信息缓存（记录每个环境 episode 的奖励、长度等）
         ep_infos = []
+        # 最近 100 个 episode 的奖励队列
         rewbuffer = deque(maxlen=100)
+        # 最近 100 个 episode 的长度队列
         lenbuffer = deque(maxlen=100)
+        # 当前每个环境累计的 episode reward
         cur_reward_sum = torch.zeros(self.env.num_envs, dtype=torch.float, device=self.device)
+        # 当前每个环境累计的 episode 长度
         cur_episode_length = torch.zeros(self.env.num_envs, dtype=torch.float, device=self.device)
 
+        # 总共要训练的迭代次数（当前迭代 + 本轮新增）
         tot_iter = self.current_learning_iteration + num_learning_iterations
+        # 主训练循环
         for it in range(self.current_learning_iteration, tot_iter):
             start = time.time()
-            # Rollout
+            # === Rollout 阶段（收集样本） ===
             with torch.inference_mode():
                 for i in range(self.num_steps_per_env):
+                    print("[DEBUG] obs range:", obs.min().item(), "~", obs.max().item())
+                    print("[DEBUG] critic_obs range:", critic_obs.min().item(), "~", critic_obs.max().item())
+                    print("[DEBUG] obs abs max:", torch.abs(obs).max().item())
+                    # 使用 actor 模型生成动作（动作是对 obs 的函数）
                     actions = self.alg.act(obs, critic_obs)
+                    print("[DEBUG] actions range:", actions.min().item(), "~", actions.max().item())  # 加在这里
+                    # 用当前动作与环境交互，获取下一步状态、奖励、done 以及 info
                     obs, privileged_obs, rewards, dones, infos = self.env.step(actions)
+                    # critic 仍优先使用特权观测
                     critic_obs = privileged_obs if privileged_obs is not None else obs
+                    # 将新一帧的数据搬到训练设备
                     obs, critic_obs, rewards, dones = obs.to(self.device), critic_obs.to(self.device), rewards.to(self.device), dones.to(self.device)
+                    # 通知算法类记录当前时间步的数据（obs, actions, rewards, dones）
                     self.alg.process_env_step(rewards, dones, infos)
                     if self.log_dir is not None:
                         # Book keeping
@@ -126,22 +148,29 @@ class OnPolicyRunner:
                         cur_episode_length[new_ids] = 0
 
                 stop = time.time()
+                # 记录 rollout 的耗时
                 collection_time = stop - start
 
                 # Learning step
                 start = stop
+                # 计算 critic 的目标值（returns & advantage 等）
                 self.alg.compute_returns(critic_obs)
-            
+
+            # 进行 PPO 多次优化 step，返回 actor 和 critic 的平均 loss
             mean_value_loss, mean_surrogate_loss = self.alg.update()
             stop = time.time()
+            # 学习阶段耗时
             learn_time = stop - start
             if self.log_dir is not None:
                 self.log(locals())
+            # 每隔固定迭代次数保存一次模型
             if it % self.save_interval == 0:
                 self.save(os.path.join(self.log_dir, 'model_{}.pt'.format(it)))
+            # 清空 episode info 缓存
             ep_infos.clear()
-        
+        # 全部训练完成后更新迭代次数
         self.current_learning_iteration += num_learning_iterations
+        # 最终保存一次模型
         self.save(os.path.join(self.log_dir, 'model_{}.pt'.format(self.current_learning_iteration)))
 
     def log(self, locs, width=80, pad=35):

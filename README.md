@@ -106,8 +106,44 @@ python legged_gym/scripts/play.py --task g1_platform --checkpoint_path logs/g1_g
 
 ```bash
 python legged_gym/scripts/train.py --task zq_ground --run_name test_zq_ground
+or
+python legged_gym/scripts/train.py --task zq_ground --run_name test_zq_ground --headless
+or
+python legged_gym/scripts/train.py --task zq_ground --run_name test_zq_ground --headless 2>&1 | tee output.txt
 ```
 
+Continue the train, just use this command(make sure the .pt model file is the latest folder)
+```shell
+python legged_gym/scripts/train.py --task zq_ground --run_name test_zq_ground --resume 
+or 
+python legged_gym/scripts/train.py --task zq_ground --run_name test_zq_ground --resume --headless
+```
+
+If success, it will output the log like 'Loaded model from...'
+```shell
+(host) unitree@unitree:~/Documents/2-HoST/HoST_fixed/legged_gym$ python legged_gym/scripts/train.py --task zq_ground --run_name test_zq_ground --resume --headless
+Importing module 'gym_38' (/home/unitree/Documents/11-kongfubot/isaacgym/python/isaacgym/_bindings/linux-x86_64/gym_38.so)
+Setting GYM_USD_PLUG_INFO_PATH to /home/unitree/Documents/11-kongfubot/isaacgym/python/isaacgym/_bindings/linux-x86_64/usd/plugInfo.json
+PyTorch version 2.0.1+cu118
+Device count 1
+/home/unitree/Documents/11-kongfubot/isaacgym/python/isaacgym/_bindings/src/gymtorch
+Using /home/unitree/.cache/torch_extensions/py38_cu118 as PyTorch extensions root...
+Emitting ninja build file /home/unitree/.cache/torch_extensions/py38_cu118/gymtorch/build.ninja...
+Building extension module gymtorch...
+Allowing ninja to set a default number of workers... (overridable by setting the environment variable MAX_JOBS=N)
+ninja: no work to do.
+Loading extension module gymtorch...
+Setting seed: 1
+Not connected to PVD
++++ Using GPU PhysX
+Physics Engine: PhysX
+Physics Device: cuda:0
+GPU Pipeline: enabled
+Loaded asset: zq_sa01.urdf
+/home/unitree/miniconda3/envs/host/lib/python3.8/site-packages/torch/functional.py:504: UserWarning: torch.meshgrid: in an upcoming release, it will be required to pass the indexing argument. (Triggered internally at ../aten/src/ATen/native/TensorShape.cpp:3483.)
+  return _VF.meshgrid(tensors, **kwargs)  # type: ignore[attr-defined]
+Loading model from: /home/unitree/Documents/2-HoST/HoST_fixed/legged_gym/logs/Zq_ground/Jul27_00-01-51_test_zq_ground/model_100.pt
+```
 
 
 # HoST: Humanoid Standing-up Control
