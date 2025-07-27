@@ -18,6 +18,16 @@ class TaskRegistry():
         self.env_cfgs = {}
         self.train_cfgs = {}
     
+    # 在__init__.py调用，注册各机器人的配置
+    # 比如 task_registry.register( "zq_ground", LeggedRobot_Zq, ZqCfgGround(), ZqCfgPPOGround())
+    # task_classes = {
+    #     "zq_ground": {
+    #         "env": LeggedRobot_Zq,
+    #         "env_cfg": ZqCfg,
+    #         "train_cfg": ZqCfgPPO
+    #     },
+    #     ...
+    # }
     def register(self, name: str, task_class: VecEnv, env_cfg: LeggedRobotCfg, train_cfg: LeggedRobotCfgPPO):
         self.task_classes[name] = task_class
         self.env_cfgs[name] = env_cfg
@@ -33,6 +43,10 @@ class TaskRegistry():
         env_cfg.seed = train_cfg.seed
         return env_cfg, train_cfg
     
+    # 定义一个名为 make_env 的函数，是某个类的方法（因为有 self）
+    # 返回值类型注解
+    # VecEnv：向量化环境对象（比如多个仿真环境一起并行执行）
+    # LeggedRobotCfg：腿型机器人的配置类
     def make_env(self, name, args=None, env_cfg=None) -> Tuple[VecEnv, LeggedRobotCfg]:
         """ Creates an environment either from a registered namme or from the provided config file.
 
@@ -49,10 +63,14 @@ class TaskRegistry():
             Dict: the corresponding config file
         """
         # if no args passed get command line arguments
+        # 第一步：传入参数并检查是否注册过
         if args is None:
             args = get_args()
         # check if there is a registered env with that name
+        # 第二步：获取环境配置 env_cfg
+        # 如果外部没有传 env_cfg，就从注册表中自动加载配置类（例如 G1CfgGround()）
         if name in self.task_classes:
+            # task_class = task_map["zq_ground"]["env"]
             task_class = self.get_task_class(name)
         else:
             raise ValueError(f"Task with name: {name} was not registered")
@@ -60,11 +78,24 @@ class TaskRegistry():
             # load config files
             env_cfg, _ = self.get_cfgs(name)
         # override cfg from args (if specified)
+        # 这一句会解析命令行参数（如 --terrain=platform），并覆盖配置项中的某些字段（如 env_cfg.terrain.mesh_type）
+        #  Python 中的一种常见多变量解包（unpacking）写法，用来表示“我只关心前面的那个值，不关心后面的”
         env_cfg, _ = update_cfg_from_args(env_cfg, None, args)
+        # 设置训练过程中所有涉及随机性的模块的随机种子，使训练过程具有可重复性（reproducibility）
         set_seed(env_cfg.seed)
         # parse sim params (convert to dict first)
+        # 第三步：构造仿真参数 sim_params, 参考 read/sim_params.md 理解
+        # 总之目的是为了读取指令输入的参数并更新到程序中
         sim_params = {"sim": class_to_dict(env_cfg.sim)}
         sim_params = parse_sim_params(args, sim_params)
+        # 第四步：构造环境对象并返回, 众擎举例 python train.py --task zq_ground --sim_device cuda:0 --physics_engine physx --headless
+        # env = LeggedRobot_Zq(
+        #     cfg=ZqCfgGround(),
+        #     sim_params={...},         # 由 parse_sim_params 生成
+        #     physics_engine="physx",
+        #     sim_device="cuda:0",
+        #     headless=True
+        # )
         env = task_class(   cfg=env_cfg,
                             sim_params=sim_params,
                             physics_engine=args.physics_engine,

@@ -9,6 +9,7 @@ from legged_gym.utils import get_args, task_registry
 import torch
 
 def train(args):
+    # 根据任务名 args.task（如 "zq_ground"）创建一个训练环境对象 env 和它的配置 env_cfg
     env, env_cfg = task_registry.make_env(name=args.task, args=args)
     ppo_runner, train_cfg = task_registry.make_alg_runner(env=env, env_cfg=env_cfg, name=args.task, args=args)
     ppo_runner.learn(num_learning_iterations=train_cfg.runner.max_iterations, init_at_random_ep_len=train_cfg.runner.init_at_random_ep_len)
