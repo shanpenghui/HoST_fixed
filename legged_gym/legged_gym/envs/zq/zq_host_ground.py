@@ -177,6 +177,35 @@ class LeggedRobot_Zq(BaseTask):
 
         self._post_physics_step_callback()
 
+        # === 调试：检查是否有非法物理状态 ===
+        if torch.isnan(self.dof_vel).any() or torch.isinf(self.dof_vel).any() or (self.dof_vel.abs() > 1e5).any():
+            bad_env_ids = torch.where(torch.isnan(self.dof_vel).any(dim=1) |
+                                      torch.isinf(self.dof_vel).any(dim=1) |
+                                      (self.dof_vel.abs() > 1e5).any(dim=1))[0]
+            print("[ERROR] Abnormal dof_vel in envs:", bad_env_ids.cpu().numpy())
+            print("  → dof_vel min/max:", self.dof_vel.min().item(), self.dof_vel.max().item())
+
+        if torch.isnan(self.base_lin_vel).any() or torch.isinf(self.base_lin_vel).any() or (self.base_lin_vel.abs() > 1e5).any():
+            bad_env_ids = torch.where(torch.isnan(self.base_lin_vel).any(dim=1) |
+                                      torch.isinf(self.base_lin_vel).any(dim=1) |
+                                      (self.base_lin_vel.abs() > 1e5).any(dim=1))[0]
+            print("[ERROR] Abnormal base_lin_vel in envs:", bad_env_ids.cpu().numpy())
+            print("  → base_lin_vel min/max:", self.base_lin_vel.min().item(), self.base_lin_vel.max().item())
+
+        if torch.isnan(self.base_ang_vel).any() or torch.isinf(self.base_ang_vel).any() or (self.base_ang_vel.abs() > 1e5).any():
+            bad_env_ids = torch.where(torch.isnan(self.base_ang_vel).any(dim=1) |
+                                      torch.isinf(self.base_ang_vel).any(dim=1) |
+                                      (self.base_ang_vel.abs() > 1e5).any(dim=1))[0]
+            print("[ERROR] Abnormal base_ang_vel in envs:", bad_env_ids.cpu().numpy())
+            print("  → base_ang_vel min/max:", self.base_ang_vel.min().item(), self.base_ang_vel.max().item())
+
+        if torch.isnan(self.base_pos).any() or torch.isinf(self.base_pos).any() or (self.base_pos.abs() > 1e5).any():
+            bad_env_ids = torch.where(torch.isnan(self.base_pos).any(dim=1) |
+                                      torch.isinf(self.base_pos).any(dim=1) |
+                                      (self.base_pos.abs() > 1e5).any(dim=1))[0]
+            print("[ERROR] Abnormal base_pos in envs:", bad_env_ids.cpu().numpy())
+            print("  → base_pos min/max:", self.base_pos.min().item(), self.base_pos.max().item())
+
         # compute observations, rewards, resets, ...
         self.check_termination()
         self.compute_reward()
@@ -221,6 +250,23 @@ class LeggedRobot_Zq(BaseTask):
         if self.base_vel_out.any():
             print(f"[TERMINATE] base_vel trigger: base_vel_norm = {base_vel_norm[self.base_vel_out]}")
 
+    def _debug_check_after_reset(self, env_ids):
+        """ 调试：检查reset后关键变量是否异常 """
+        check_list = {
+            'dof_vel': self.dof_vel,
+            'dof_pos': self.dof_pos,
+            'base_pos': self.base_pos,
+            'base_quat': self.base_quat,
+            'base_lin_vel': self.base_lin_vel,
+            'base_ang_vel': self.base_ang_vel,
+        }
+
+        for name, tensor in check_list.items():
+            if torch.isnan(tensor[env_ids]).any() or torch.isinf(tensor[env_ids]).any() or (tensor[env_ids].abs() > 1e5).any():
+                bad_ids = env_ids[torch.any(torch.isnan(tensor[env_ids]) | torch.isinf(tensor[env_ids]) | (tensor[env_ids].abs() > 1e5), dim=1)]
+                print(f"[RESET ERROR] {name} contains invalid values after reset in envs:", bad_ids.cpu().numpy())
+                print(f"→ {name} range: min={tensor[env_ids].min().item():.4f}, max={tensor[env_ids].max().item():.4f}")
+
     def reset_idx(self, env_ids):
         """ Reset some environments.
             Calls self._reset_dofs(env_ids), self._reset_root_states(env_ids), and self._resample_commands(env_ids)
@@ -242,6 +288,9 @@ class LeggedRobot_Zq(BaseTask):
         self._reset_root_states(env_ids)
 
         self.update_force_curriculum(env_ids)
+
+        # === 添加调试点 ===
+        self._debug_check_after_reset(env_ids)
 
         # reset buffers
         self.last_actions[env_ids] = 0.
