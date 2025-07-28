@@ -123,17 +123,33 @@ class ActorCritic(nn.Module):
         if torch.isnan(observations).any() or torch.isinf(observations).any():
             print("[ERROR] Invalid obs detected before actor forward")
             print("→ obs min/max:", observations.min().item(), observations.max().item())
+            print("→ example invalid obs:", observations[~torch.isfinite(observations).any(dim=1)][:5])
 
         # ====== 第二步：actor 输出均值（动作） ======
         mean = self.actor(observations)
 
         # ====== 第三步：检查 actor 输出是否合法 ======
-        if torch.isnan(mean).any() or torch.isinf(mean).any() or (mean.abs() > 1e6).any():
+        if not torch.isfinite(mean).all():
             print("[ERROR] Invalid mean output by actor")
+            invalid_mask = ~torch.isfinite(mean)
             print("→ mean min/max:", mean.min().item(), mean.max().item())
+            print("→ 非法 mean 索引:", torch.nonzero(invalid_mask))
+            print("→ 非法 mean 示例:", mean[invalid_mask.any(dim=1)][:5])
+            print("→ 对应 obs:", observations[invalid_mask.any(dim=1)][:5])
+
+        if (mean.abs() > 1e3).any():
+            print("[WARN] mean 可能爆炸（>1e3）")
+            print("→ mean max:", mean.max().item(), "mean min:", mean.min().item())
+            print("→ 异常 mean 行:")
+            print(mean[mean.abs().max(dim=1).values > 1e3])
 
         # ====== 第四步：构造高斯分布 ======
-        self.distribution = Normal(mean, mean*0. + self.std)
+        # 若 std 不是浮点数或非法，也要报错
+        if not torch.isfinite(self.std).all():
+            print("[ERROR] Invalid std parameter")
+            print("→ std:", self.std)
+
+        self.distribution = Normal(mean, mean * 0. + self.std)
 
     def act(self, observations, **kwargs):
         self.update_distribution(observations)
