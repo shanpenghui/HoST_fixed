@@ -391,31 +391,56 @@ class LeggedRobot_Zq(BaseTask):
             self.episode_sums[rg] = self.rew_buf[:, idx]
 
     def compute_observations(self):
-        """ Computes observations
-        """
-        current_obs = torch.cat(( 
-                                self.base_ang_vel  * self.obs_scales.ang_vel,
-                                self.projected_gravity,
-                                self.dof_pos * self.obs_scales.dof_pos,
-                                self.dof_vel * self.obs_scales.dof_vel,
-                                self.actions,
-                                self.action_rescale + (torch.rand_like(self.action_rescale) - 0.5) * 0.05,
-                                ),dim=-1)
-        # === 添加调试打印，不修改功能 ===
-        # print("[DEBUG] base_ang_vel     range:", self.base_ang_vel.min().item(), "~", self.base_ang_vel.max().item())
-        # print("[DEBUG] projected_gravity range:", self.projected_gravity.min().item(), "~", self.projected_gravity.max().item())
-        # print("[DEBUG] dof_pos          range:", self.dof_pos.min().item(), "~", self.dof_pos.max().item())
-        # print("[DEBUG] dof_vel          range:", self.dof_vel.min().item(), "~", self.dof_vel.max().item())
-        # print("[DEBUG] actions          range:", self.actions.min().item(), "~", self.actions.max().item())
-        # print("[DEBUG] action_rescale   range:", self.action_rescale.min().item(), "~", self.action_rescale.max().item())
-        # print("[DEBUG] current_obs      range:", current_obs.min().item(), "~", current_obs.max().item())
+        """ Computes observations with debugging logs to locate potential explosion. """
 
+        # ========== 逐项检查输入 ==========
+        def check_tensor(name, tensor, threshold=1e5):
+            if torch.isnan(tensor).any() or torch.isinf(tensor).any() or tensor.abs().max() > threshold:
+                bad_envs = torch.where(
+                    torch.isnan(tensor).any(dim=1) |
+                    torch.isinf(tensor).any(dim=1) |
+                    (tensor.abs() > threshold).any(dim=1)
+                )[0]
+                print(f"[ERROR] {name} abnormal in envs:", bad_envs.cpu().numpy())
+                print(f"  → {name} min/max:", tensor.min().item(), tensor.max().item())
+            else:
+                print(f"[OK] {name} range: {tensor.min().item()} ~ {tensor.max().item()}")
+
+        check_tensor("base_ang_vel", self.base_ang_vel)
+        check_tensor("projected_gravity", self.projected_gravity)
+        check_tensor("dof_pos", self.dof_pos)
+        check_tensor("dof_vel", self.dof_vel)
+        check_tensor("actions", self.actions)
+        check_tensor("action_rescale", self.action_rescale)
+
+        # ========== 拼接观测向量 ==========
+        current_obs = torch.cat((
+            self.base_ang_vel  * self.obs_scales.ang_vel,
+            self.projected_gravity,
+            self.dof_pos * self.obs_scales.dof_pos,
+            self.dof_vel * self.obs_scales.dof_vel,
+            self.actions,
+            self.action_rescale + (torch.rand_like(self.action_rescale) - 0.5) * 0.05,
+        ),dim=-1)
+
+        check_tensor("current_obs (before noise)", current_obs)
+
+        # ========== 加噪声 ==========
         if self.add_noise:
             current_obs += (2 * torch.rand_like(current_obs) - 1) * self.noise_scale_vec
 
+        # ========== 忽略起始阶段 ==========
         current_obs *= self.real_episode_length_buf.unsqueeze(1) > self.unactuated_time
-        self.obs_buf = torch.cat((self.obs_buf[:, self.num_one_step_obs:self.actor_proprioceptive_obs_length], current_obs), dim=-1)
-        # print('obs_buf',self.obs_buf)
+
+        check_tensor("current_obs (after noise & unactuated mask)", current_obs)
+
+        # ========== 拼接历史观测 ==========
+        self.obs_buf = torch.cat((
+            self.obs_buf[:, self.num_one_step_obs:self.actor_proprioceptive_obs_length],
+            current_obs
+        ), dim=-1)
+
+        check_tensor("final obs_buf", self.obs_buf)
     def create_sim(self):
         """ Creates simulation, terrain and evironments
         """
@@ -548,7 +573,18 @@ class LeggedRobot_Zq(BaseTask):
         """ Random pushes the robots. Emulates an impulse by setting a randomized base velocity. 
         """
         max_vel = self.cfg.domain_rand.max_push_vel_xy
-        self.root_states[:, 7:10] = torch_rand_float(-max_vel, max_vel, (self.num_envs, 3), device=self.device) # lin vel x/y
+
+        # 添加调试：生成的随机速度
+        push_vel = torch_rand_float(-max_vel, max_vel, (self.num_envs, 3), device=self.device)
+        print("[DEBUG][push_robots] generated push_vel min/max:",
+              push_vel.min().item(), push_vel.max().item())
+
+        # 写入线速度
+        self.root_states[:, 7:10] = push_vel
+        print("[DEBUG][push_robots] updated root_states[:, 7:10] lin_vel min/max:",
+              self.root_states[:, 7:10].min().item(), self.root_states[:, 7:10].max().item())
+
+        # 写入 sim
         self.gym.set_actor_root_state_tensor(self.sim, gymtorch.unwrap_tensor(self.root_states))
         # print('push_robots',self.root_states[:, 7:10])
     def _compute_torques(self, actions):
@@ -625,12 +661,24 @@ class LeggedRobot_Zq(BaseTask):
         # base position
         if self.custom_origins:
             self.root_states[env_ids] = self.base_init_state
+            print("[DEBUG][reset_root_states] Step 1 base_init_state assigned:", self.root_states[env_ids])
+
             self.root_states[env_ids, :3] += self.env_origins[env_ids]
-            self.root_states[env_ids, :2] += torch_rand_float(-1., 1., (len(env_ids), 2), device=self.device) # xy position within 1m of the center
+            print("[DEBUG][reset_root_states] Step 2 added env_origins:", self.root_states[env_ids, :3])
+
+            self.root_states[env_ids, :2] += torch_rand_float(-1., 1., (len(env_ids), 2), device=self.device)
+            print("[DEBUG][reset_root_states] Step 3 added random xy offset:", self.root_states[env_ids, :2])
         else:
             self.root_states[env_ids] = self.base_init_state
-            self.root_states[env_ids, :3] += self.env_origins[env_ids]
+            print("[DEBUG][reset_root_states] Step 1 base_init_state assigned:", self.root_states[env_ids])
 
+            self.root_states[env_ids, :3] += self.env_origins[env_ids]
+            print("[DEBUG][reset_root_states] Step 2 added env_origins:", self.root_states[env_ids, :3])
+
+        # 可选：打印所有 root_state（pos+quat+vel）
+        print("[DEBUG][reset_root_states] Final root_states[env_ids]:", self.root_states[env_ids])
+
+        # 正式写入 sim 环境中
         env_ids_int32 = env_ids.to(dtype=torch.int32)
         self.gym.set_actor_root_state_tensor_indexed(self.sim,
                                                      gymtorch.unwrap_tensor(self.root_states),
