@@ -324,12 +324,16 @@ class LeggedRobot_Zq(BaseTask):
 
         # === 调试点 3：验证 dof_state 是否同步成功 ===
         with torch.no_grad():
-            pos_ok = torch.allclose(self.dof_state[env_ids, :self.num_dof], self.dof_pos[env_ids], atol=1e-4)
-            vel_ok = torch.allclose(self.dof_state[env_ids, self.num_dof:], self.dof_vel[env_ids], atol=1e-4)
+            # 将 dof_state 恢复为 [num_envs, num_dof, 2]
+            dof_state_view = self.dof_state.view(self.num_envs, self.num_dof, 2)
+
+            pos_ok = torch.allclose(dof_state_view[env_ids, :, 0], self.dof_pos[env_ids], atol=1e-4)
+            vel_ok = torch.allclose(dof_state_view[env_ids, :, 1], self.dof_vel[env_ids], atol=1e-4)
+
             if not pos_ok or not vel_ok:
                 print(f"[ERROR][reset_idx] dof_state sync failed for some envs in {env_ids}")
-                print("  → pos diff max:", (self.dof_state[env_ids, :self.num_dof] - self.dof_pos[env_ids]).abs().max().item())
-                print("  → vel diff max:", (self.dof_state[env_ids, self.num_dof:] - self.dof_vel[env_ids]).abs().max().item())
+                print("  → pos diff max:", (dof_state_view[env_ids, :, 0] - self.dof_pos[env_ids]).abs().max().item())
+                print("  → vel diff max:", (dof_state_view[env_ids, :, 1] - self.dof_vel[env_ids]).abs().max().item())
             else:
                 print(f"[OK][reset_idx] dof_state is in sync with dof_pos/dof_vel ✓")
 
