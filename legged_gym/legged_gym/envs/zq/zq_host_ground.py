@@ -250,23 +250,6 @@ class LeggedRobot_Zq(BaseTask):
         if self.base_vel_out.any():
             print(f"[TERMINATE] base_vel trigger: base_vel_norm = {base_vel_norm[self.base_vel_out]}")
 
-    def _debug_check_after_reset(self, env_ids):
-        """ 调试：检查reset后关键变量是否异常 """
-        check_list = {
-            'dof_vel': self.dof_vel,
-            'dof_pos': self.dof_pos,
-            'base_pos': self.base_pos,
-            'base_quat': self.base_quat,
-            'base_lin_vel': self.base_lin_vel,
-            'base_ang_vel': self.base_ang_vel,
-        }
-
-        for name, tensor in check_list.items():
-            if torch.isnan(tensor[env_ids]).any() or torch.isinf(tensor[env_ids]).any() or (tensor[env_ids].abs() > 1e5).any():
-                bad_ids = env_ids[torch.any(torch.isnan(tensor[env_ids]) | torch.isinf(tensor[env_ids]) | (tensor[env_ids].abs() > 1e5), dim=1)]
-                print(f"[RESET ERROR] {name} contains invalid values after reset in envs:", bad_ids.cpu().numpy())
-                print(f"→ {name} range: min={tensor[env_ids].min().item():.4f}, max={tensor[env_ids].max().item():.4f}")
-
     def reset_idx(self, env_ids):
         """ Reset some environments.
             Calls self._reset_dofs(env_ids), self._reset_root_states(env_ids), and self._resample_commands(env_ids)
@@ -299,9 +282,6 @@ class LeggedRobot_Zq(BaseTask):
         self._reset_root_states(env_ids)
 
         self.update_force_curriculum(env_ids)
-
-        # === 添加调试点 ===
-        self._debug_check_after_reset(env_ids)
 
         # reset buffers
         self.last_actions[env_ids] = 0.
@@ -341,6 +321,18 @@ class LeggedRobot_Zq(BaseTask):
             self.motor_strength[env_ids] = torch_rand_float(self.cfg.domain_rand.motor_strength_range[0], self.cfg.domain_rand.motor_strength_range[1], (len(env_ids), self.num_dof), device=self.device)
         if self.cfg.domain_rand.delay:
             self.delay_idx[env_ids] = torch.randint(low=0, high=self.cfg.domain_rand.max_delay_timesteps, size=(len(env_ids), ), device=self.device)
+
+        # === 调试点 3：验证 dof_state 是否同步成功 ===
+        with torch.no_grad():
+            pos_ok = torch.allclose(self.dof_state[env_ids, :self.num_dof], self.dof_pos[env_ids], atol=1e-4)
+            vel_ok = torch.allclose(self.dof_state[env_ids, self.num_dof:], self.dof_vel[env_ids], atol=1e-4)
+            if not pos_ok or not vel_ok:
+                print(f"[ERROR][reset_idx] dof_state sync failed for some envs in {env_ids}")
+                print("  → pos diff max:", (self.dof_state[env_ids, :self.num_dof] - self.dof_pos[env_ids]).abs().max().item())
+                print("  → vel diff max:", (self.dof_state[env_ids, self.num_dof:] - self.dof_vel[env_ids]).abs().max().item())
+            else:
+                print(f"[OK][reset_idx] dof_state is in sync with dof_pos/dof_vel ✓")
+
 
     def compute_reward(self):
         """ Compute rewards
@@ -658,6 +650,17 @@ class LeggedRobot_Zq(BaseTask):
         self.dof_vel[env_ids] = 0.
 
         env_ids_int32 = env_ids.to(dtype=torch.int32)
+        # === 调试点 1：检查 dof_pos / dof_vel 数值是否正常 ===
+        with torch.no_grad():
+            dof_pos_val = self.dof_pos[env_ids]
+            dof_vel_val = self.dof_vel[env_ids]
+            if not torch.isfinite(dof_pos_val).all():
+                print(f"[ERROR][reset_dofs] NaN/INF in dof_pos! env_ids = {env_ids}")
+            if not torch.isfinite(dof_vel_val).all():
+                print(f"[ERROR][reset_dofs] NaN/INF in dof_vel! env_ids = {env_ids}")
+            print(f"[DEBUG][reset_dofs] dof_pos range: {dof_pos_val.min():.2e} ~ {dof_pos_val.max():.2e}")
+            print(f"[DEBUG][reset_dofs] dof_vel range: {dof_vel_val.min():.2e} ~ {dof_vel_val.max():.2e}")
+
         self.gym.set_dof_state_tensor_indexed(self.sim,
                                               gymtorch.unwrap_tensor(self.dof_state),
                                               gymtorch.unwrap_tensor(env_ids_int32), len(env_ids_int32))
@@ -691,6 +694,15 @@ class LeggedRobot_Zq(BaseTask):
 
         # 正式写入 sim 环境中
         env_ids_int32 = env_ids.to(dtype=torch.int32)
+        # === 调试点 2：检查 root_states 数值是否正常 ===
+        with torch.no_grad():
+            rs = self.root_states[env_ids]
+            if not torch.isfinite(rs).all():
+                bad_envs = env_ids[~torch.isfinite(rs).all(dim=1)]
+                print(f"[ERROR][reset_root] NaN/INF in root_states! bad_envs = {bad_envs}")
+            print(f"[DEBUG][reset_root] root_states pos range: {rs[:, :3].min():.2e} ~ {rs[:, :3].max():.2e}")
+            print(f"[DEBUG][reset_root] root_states vel range: {rs[:, 7:13].min():.2e} ~ {rs[:, 7:13].max():.2e}")
+
         self.gym.set_actor_root_state_tensor_indexed(self.sim,
                                                      gymtorch.unwrap_tensor(self.root_states),
                                                      gymtorch.unwrap_tensor(env_ids_int32), len(env_ids_int32))
