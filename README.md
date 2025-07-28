@@ -60,7 +60,7 @@ The aliases was originally deprecated in NumPy 1.20; for more details and guidan
 ```
 
 find the file: /root/isaacgym/python/isaacgym/torch_utils.py
-change the type
+change the type in line 135
 
 ```shell
 #def get_axis_params(value, axis_idx, x_value=0., dtype=np.float, n_dims=3):
@@ -233,7 +233,9 @@ pip3 install torch==1.10.0+cu113 torchvision==0.11.1+cu113 torchaudio==0.10.0+cu
 
 Download and install [Isaac Gym](https://developer.nvidia.com/isaac-gym):
 ```bash
-cd isaacgym/python && pip install -e .
+wget https://developer.nvidia.com/isaac-gym-preview-4
+tar -xvzf isaac-gym-preview-4
+cd isaacgym/python && pip install -e . && cd ../..
 ```
 Install rsl_rl (PPO implementation) and legged gym:
 ```bash

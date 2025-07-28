@@ -277,7 +277,18 @@ class LeggedRobot_Zq(BaseTask):
         Args:
             env_ids (list[int]): List of environment ids which must be reset
         """
+        # 放在 reset_idx() 的最前面
+        if not hasattr(self, "_debug_first_reset_step"):
+            self._debug_first_reset_step = None
+
+        if self._debug_first_reset_step is None and len(env_ids) > 0:
+            self._debug_first_reset_step = int(self.episode_length_buf.max().item())
+            print(f"[DEBUG] First reset triggered at step: {self._debug_first_reset_step}")
+
+        print(f"[DEBUG] Called reset_idx, env_ids = {env_ids}")
+        # assert len(env_ids) > 0, "[FATAL] reset_idx got empty env_ids!"
         if len(env_ids) == 0:
+            print(f"[WARN] No envs to reset! Skipping reset_idx.")
             return
             
         self.extras["episode"] = {}
@@ -661,22 +672,22 @@ class LeggedRobot_Zq(BaseTask):
         # base position
         if self.custom_origins:
             self.root_states[env_ids] = self.base_init_state
-            print("[DEBUG][reset_root_states] Step 1 base_init_state assigned:", self.root_states[env_ids])
+            # print("[DEBUG][reset_root_states] Step 1 base_init_state assigned:", self.root_states[env_ids])
 
             self.root_states[env_ids, :3] += self.env_origins[env_ids]
-            print("[DEBUG][reset_root_states] Step 2 added env_origins:", self.root_states[env_ids, :3])
+            # print("[DEBUG][reset_root_states] Step 2 added env_origins:", self.root_states[env_ids, :3])
 
             self.root_states[env_ids, :2] += torch_rand_float(-1., 1., (len(env_ids), 2), device=self.device)
-            print("[DEBUG][reset_root_states] Step 3 added random xy offset:", self.root_states[env_ids, :2])
+            # print("[DEBUG][reset_root_states] Step 3 added random xy offset:", self.root_states[env_ids, :2])
         else:
             self.root_states[env_ids] = self.base_init_state
-            print("[DEBUG][reset_root_states] Step 1 base_init_state assigned:", self.root_states[env_ids])
+            # print("[DEBUG][reset_root_states] Step 1 base_init_state assigned:", self.root_states[env_ids])
 
             self.root_states[env_ids, :3] += self.env_origins[env_ids]
-            print("[DEBUG][reset_root_states] Step 2 added env_origins:", self.root_states[env_ids, :3])
+            # print("[DEBUG][reset_root_states] Step 2 added env_origins:", self.root_states[env_ids, :3])
 
         # 可选：打印所有 root_state（pos+quat+vel）
-        print("[DEBUG][reset_root_states] Final root_states[env_ids]:", self.root_states[env_ids])
+        # print("[DEBUG][reset_root_states] Final root_states[env_ids]:", self.root_states[env_ids])
 
         # 正式写入 sim 环境中
         env_ids_int32 = env_ids.to(dtype=torch.int32)
@@ -1278,12 +1289,15 @@ class LeggedRobot_Zq(BaseTask):
         else:
             base_height = self.root_states[:, 2] > self.cfg.rewards.target_base_height_phase1
             reward = tolerance(-self.projected_gravity[:, 2], [self.cfg.rewards.orientation_threshold, np.inf], 1., 0.05) #-1 
+        print(f"[REWARD] _reward_orientation: mean={reward.mean():.4f}, max={reward.max():.4f}, min={reward.min():.4f}")
         return reward
 
     def _reward_head_height(self):
         if not self.is_gaussian:
             head_height = self.rigid_body_states[:, self.head_indices, 2].clone()
-            return head_height.squeeze(1).clamp(0, 1)
+            reward = head_height.squeeze(1).clamp(0, 1)
+            print(f"[REWARD] _reward_head_height (non-Gaussian): mean={reward.mean().item():.4f}, max={reward.max().item():.4f}, min={reward.min().item():.4f}")
+            return reward
         else:
             head_height = self.rigid_body_states[:, self.head_indices, 2].clone()
             feet_height = self.rigid_body_states[:, self.feet_indices, 2].clone().mean(-1).unsqueeze(-1)
@@ -1293,79 +1307,97 @@ class LeggedRobot_Zq(BaseTask):
             delta_headheight = head_height - self.old_headheight
             self.max_headheight = torch.max(torch.cat((head_height, self.old_headheight), dim=1), dim=1)[0].unsqueeze(-1)
             self.old_headheight = head_height
+            print(f"[REWARD] _reward_head_height (Gaussian): mean={reward.mean().item():.4f}, max={reward.max().item():.4f}, min={reward.min().item():.4f}")
             return reward
 
 
     #-----------------------------regularization rewards-----------------------------
     def _reward_dof_acc(self):
         acc = (self.last_dof_vel - self.dof_vel) / self.dt
-
-        # 限制 acc 范围，避免 reward 爆炸
-        # acc = torch.clamp(acc, -1e3, 1e3)
-
         reward = torch.sum(torch.square(acc), dim=1)
 
-        # 新增范围检查（绝对值大于 1e4）
-        # if torch.any(torch.abs(acc) > 1e4):
-        #     print("[DEBUG] _reward_dof_acc abnormal acc detected")
-        #     print("        acc max:", acc.max().item(), "acc min:", acc.min().item())
-        #     print("        self.dof_vel max:", self.dof_vel.max().item(), "min:", self.dof_vel.min().item())
-        #     print("        self.last_dof_vel max:", self.last_dof_vel.max().item(), "min:", self.last_dof_vel.min().item())
+        # 基本统计信息打印
+        print(f"[REWARD] _reward_dof_acc: mean={reward.mean().item():.4f}, max={reward.max().item():.4f}, min={reward.min().item():.4f}")
+
+        # 异常加速度范围检测（可选）
+        if torch.any(torch.abs(acc) > 1e3):
+            print("[DEBUG] _reward_dof_acc abnormal acc detected")
+            print(f"        acc max: {acc.max().item():.2e}, acc min: {acc.min().item():.2e}")
+            print(f"        dof_vel max: {self.dof_vel.max().item():.2e}, min: {self.dof_vel.min().item():.2e}")
+            print(f"        last_dof_vel max: {self.last_dof_vel.max().item():.2e}, min: {self.last_dof_vel.min().item():.2e}")
 
         return reward
 
     def _reward_action_rate(self):
-        # Penalize changes in actions
-        return torch.sum(torch.square(self.last_actions - self.actions), dim=1)
+        reward = torch.sum(torch.square(self.last_actions - self.actions), dim=1)
+        print(f"[REWARD] _reward_action_rate: mean={reward.mean():.4f}, max={reward.max():.4f}, min={reward.min():.4f}")
+        return reward
 
+    # 二阶动作变化（即 jerk）
     def _reward_smoothness(self):
         # second order smoothness
-        return torch.sum(torch.square(self.actions - self.last_actions - self.last_actions + self.last_last_actions), dim=1)
-
+        jerk = self.actions - 2 * self.last_actions + self.last_last_actions
+        reward = torch.sum(torch.square(jerk), dim=1)
+        print(f"[REWARD] _reward_smoothness: mean={reward.mean().item():.4f}, max={reward.max().item():.4f}, min={reward.min().item():.4f}")
+        return reward
     def _reward_torques(self):
-        # Penalize torques
-        return torch.sum(torch.square(self.torques), dim=1)
-
+        reward = torch.sum(torch.square(self.torques), dim=1)
+        print(f"[REWARD] _reward_torques: mean={reward.mean().item():.4f}, max={reward.max().item():.4f}, min={reward.min().item():.4f}")
+        return reward
     def _reward_joint_power(self):
         #Penalize high power
-        return torch.sum(torch.abs(self.dof_vel) * torch.abs(self.torques), dim=1) 
-
+        reward = torch.sum(torch.abs(self.dof_vel) * torch.abs(self.torques), dim=1)
+        print(f"[REWARD] _reward_joint_power: mean={reward.mean().item():.4f}, max={reward.max().item():.4f}, min={reward.min().item():.4f}")
+        return reward
     def _reward_dof_vel(self):
         # Penalize dof velocities
-        return torch.sum(torch.square(self.dof_vel), dim=1)
+        reward = torch.sum(torch.square(self.dof_vel), dim=1)
+        print(f"[REWARD] _reward_dof_vel: mean={reward.mean().item():.4f}, max={reward.max().item():.4f}, min={reward.min().item():.4f}")
+        return reward
 
     def _reward_joint_tracking_error(self):
-        return torch.sum(torch.square(self.joint_pos_target - self.dof_pos), dim=-1)
+        reward = torch.sum(torch.square(self.joint_pos_target - self.dof_pos), dim=-1)
+        print(f"[REWARD] _reward_joint_tracking_error: mean={reward.mean().item():.4f}, max={reward.max().item():.4f}, min={reward.min().item():.4f}")
+        return reward
 
     def _reward_dof_pos_limits(self):
         # Penalize dof positions too close to the limit
-        out_of_limits = -(self.dof_pos - self.dof_pos_limits[:, 0]).clip(max=0.) # lower limit
+        out_of_limits = -(self.dof_pos - self.dof_pos_limits[:, 0]).clip(max=0.)  # lower limit
         out_of_limits += (self.dof_pos - self.dof_pos_limits[:, 1]).clip(min=0.)
-        return torch.sum(out_of_limits, dim=1)
+        reward = torch.sum(out_of_limits, dim=1)
+        print(f"[REWARD] _reward_dof_pos_limits: mean={reward.mean().item():.4f}, max={reward.max().item():.4f}, min={reward.min().item():.4f}")
+        return reward
 
     def _reward_dof_vel_limits(self):
         # Penalize dof velocities too close to the limit
-        return torch.sum((torch.abs(self.dof_vel) - self.dof_vel_limits*self.cfg.rewards.soft_dof_vel_limit).clip(min=0., max=1.), dim=1)
-
+        reward = torch.sum((torch.abs(self.dof_vel) - self.dof_vel_limits * self.cfg.rewards.soft_dof_vel_limit).clip(min=0., max=1.), dim=1)
+        print(f"[REWARD] _reward_dof_vel_limits: mean={reward.mean().item():.4f}, max={reward.max().item():.4f}, min={reward.min().item():.4f}")
+        return reward
     def _reward_torque_limits(self):
         # penalize torques too close to the limit
-        return torch.sum((torch.abs(self.torques) - self.torque_limits*self.cfg.rewards.soft_torque_limit).clip(min=0.), dim=1)
-
+        reward = torch.sum((torch.abs(self.torques) - self.torque_limits * self.cfg.rewards.soft_torque_limit).clip(min=0.), dim=1)
+        print(f"[REWARD] _reward_torque_limits: mean={reward.mean().item():.4f}, max={reward.max().item():.4f}, min={reward.min().item():.4f}")
+        return reward
 
     #-----------------------------style rewards-----------------------------
     def _reward_waist_deviation(self):
         wrist_dof = self.dof_pos[:, self.waist_joint_indices]
         reward = (torch.abs(wrist_dof) > 1.4).float()
+        print(f"[REWARD] _reward_waist_deviation: mean={reward.mean():.4f}, max={reward.max():.4f}, min={reward.min():.4f}")
         return reward.squeeze(1)
 
     def _reward_hip_yaw_deviation(self):
         hip_yaw_dof = self.dof_pos[:, self.hip_joint_indices]
         reward = (torch.max(torch.abs(self.dof_pos[:, self.hip_joint_indices]), dim=-1)[0] > 1.4) | (torch.min(torch.abs(self.dof_pos[:, self.hip_joint_indices]), dim=-1)[0] > 0.9)
+        reward_float = reward.float()
+        print(f"[REWARD] _reward_hip_yaw_deviation: mean={reward_float.mean():.4f}, max={reward_float.max():.1f}, min={reward_float.min():.1f}")
         return reward
 
     def _reward_hip_roll_deviation(self):
         hip_roll_dof = self.dof_pos[:, self.hip_roll_joint_indices]
         reward = (torch.max(torch.abs(self.dof_pos[:, self.hip_roll_joint_indices]), dim=-1)[0] >  1.4) | (torch.min(torch.abs(self.dof_pos[:, self.hip_roll_joint_indices]), dim=-1)[0] > 0.9)
+        reward_float = reward.float()
+        print(f"[REWARD] _reward_hip_roll_deviation: mean={reward_float.mean():.4f}, max={reward_float.max():.1f}, min={reward_float.min():.1f}")
         return reward
 
     def _reward_left_foot_displacement(self):
@@ -1379,6 +1411,8 @@ class LeggedRobot_Zq(BaseTask):
 
         standup  = self.root_states[:, 2] > self.cfg.rewards.target_base_height_phase3
         # standup  = self.root_states[:, 2] > self.cfg.rewards.target_base_height_phase2 #better standing style
+        print(f"[REWARD] _reward_left_foot_displacement: mean={reward.mean():.4f}, max={reward.max():.4f}, min={reward.min():.4f}")
+
         return reward * standup
 
     def _reward_right_foot_displacement(self):
@@ -1392,11 +1426,14 @@ class LeggedRobot_Zq(BaseTask):
 
         # standup  = self.root_states[:, 2] > self.cfg.rewards.target_base_height_phase2 #better standing style
         standup  = self.root_states[:, 2] > self.cfg.rewards.target_base_height_phase3
+        print(f"[REWARD] _reward_right_foot_displacement: mean={reward.mean():.4f}, max={reward.max():.4f}, min={reward.min():.4f}")
         return reward * standup
 
     def _reward_knee_deviation(self):
         hip_roll_dof = self.dof_pos[:, self.knee_joint_indices]
         reward = (torch.max(torch.abs(self.dof_pos[:, self.knee_joint_indices]), dim=-1)[0] > 2.85) | (torch.min(self.dof_pos[:, self.knee_joint_indices], dim=-1)[0] < -0.06)
+        reward_float = reward.float()
+        print(f"[REWARD] _reward_knee_deviation: mean={reward_float.mean():.4f}, max={reward_float.max():.4f}, min={reward_float.min():.4f}")
         return reward
 
     def _reward_shank_orientation(self):
@@ -1416,7 +1453,9 @@ class LeggedRobot_Zq(BaseTask):
         if self.cfg.constraints.post_task:
             standup  = self.root_states[:, 2] > self.cfg.rewards.target_base_height_phase3
             reward = reward * ~standup + torch.ones_like(reward) * standup
-        return reward 
+        print(f"[REWARD] _reward_shank_orientation: mean={reward.mean():.4f}, max={reward.max():.4f}, min={reward.min():.4f}")
+
+        return reward
 
     def _reward_ground_parallel(self):
         left_ankle_pos = self.rigid_body_states[:, self.left_ankle_indices, 2].clone() * 10
@@ -1428,6 +1467,8 @@ class LeggedRobot_Zq(BaseTask):
         if self.cfg.constraints.post_task:
             standup  = self.root_states[:, 2] > self.cfg.rewards.target_base_height_phase3
             reward = reward * ~standup + torch.ones_like(reward) * standup
+        print(f"[REWARD] _reward_ground_parallel: mean={reward.float().mean():.4f}, max={reward.float().max():.1f}, min={reward.float().min():.1f}")
+
         return reward
 
     def _reward_feet_distance(self):
@@ -1436,14 +1477,17 @@ class LeggedRobot_Zq(BaseTask):
         feet_distances = torch.norm(left_foot_pos - right_foot_pos, dim=-1)
         reward = tolerance(feet_distances, [0, 0.4], 0.38, 0.05)
         # return (feet_distances > 0.33).squeeze(1) #better standing style
+        print(f"[REWARD] _reward_feet_distance: mean={reward.mean():.4f}, max={reward.max():.4f}, min={reward.min():.4f}")
+
         return (feet_distances > 0.9).squeeze(1)
 
 
     def _reward_style_ang_vel_xy(self):
         # Penalize xy axes base angular velocity
         base_height = self.root_states[:, 2] > self.cfg.rewards.target_base_height_phase1
-        return torch.exp(torch.sum(torch.square(self.base_ang_vel[:, :2]), dim=1) * -2) * base_height
-    
+        reward = torch.exp(torch.sum(torch.square(self.base_ang_vel[:, :2]), dim=1) * -2) * base_height
+        print(f"[REWARD] _reward_style_ang_vel_xy: mean={reward.mean():.4f}, max={reward.max():.4f}, min={reward.min():.4f}")
+        return reward
     def _reward_soft_symmetry_action(self):
         left_body_action = self.actions[:, self.left_leg_joints_indices] # [num_envs, 6]
         right_body_action = self.actions[:, self.right_leg_joints_indices] # [num_envs, 6]
@@ -1454,8 +1498,9 @@ class LeggedRobot_Zq(BaseTask):
         standup =self.root_states[:, 2] > self.cfg.rewards.target_base_height_phase3
         body_symmetry[~standup] *= 0
         body_symmetry = body_symmetry * torch.clamp(-self.projected_gravity[:, 2], 0, 0.9) / 0.9
-
-        return body_symmetry
+        reward = body_symmetry
+        print(f"[REWARD] _reward_soft_symmetry_action: mean={reward.mean():.4f}, max={reward.max():.4f}, min={reward.min():.4f}")
+        return reward
     def _reward_soft_symmetry_body(self):
         left_body = self.dof_pos[:, self.left_leg_joints_indices] # [num_envs, 6]
         right_body = self.dof_pos[:, self.right_leg_joints_indices] # [num_envs, 6]
@@ -1470,6 +1515,7 @@ class LeggedRobot_Zq(BaseTask):
 
         reward[~standup] *= 0
         reward = reward * torch.clamp(-self.projected_gravity[:, 2], 0, 0.9) / 0.9
+        print(f"[REWARD] _reward_soft_symmetry_body: mean={reward.mean():.4f}, max={reward.max():.4f}, min={reward.min():.4f}")
 
         return reward
  
@@ -1478,6 +1524,7 @@ class LeggedRobot_Zq(BaseTask):
         # Penalize xy axes base angular velocity
         base_height = self.root_states[:, 2] > self.cfg.rewards.target_base_height_phase3
         reward=torch.exp(torch.sum(torch.square(self.base_ang_vel[:, :2]), dim=1) * -2) * base_height
+        print(f"[REWARD] _reward_ang_vel_xy: mean={reward.mean():.4f}, max={reward.max():.4f}, min={reward.min():.4f}")
 
         return reward
  
@@ -1485,6 +1532,7 @@ class LeggedRobot_Zq(BaseTask):
         # Penalize z axis base linear velocity
         base_height = self.root_states[:, 2] > self.cfg.rewards.target_base_height_phase3
         reward=torch.exp(torch.sum(torch.square(self.base_lin_vel[:, :2]), dim=1) * -5) * base_height
+        print(f"[REWARD] _reward_lin_vel_xy: mean={reward.mean():.4f}, max={reward.max():.4f}, min={reward.min():.4f}")
 
         return reward
 
@@ -1494,22 +1542,30 @@ class LeggedRobot_Zq(BaseTask):
         feet_distance = torch.abs(left_foot_height - right_foot_height).squeeze(1).clamp(0.2, np.inf)
         standup  = self.root_states[:, 2] > self.cfg.rewards.target_base_height_phase3
         reward=torch.exp(feet_distance * -2) * standup
+        print(f"[REWARD] _reward_feet_height_var: mean={reward.mean():.4f}, max={reward.max():.4f}, min={reward.min():.4f}")
+
         return reward
     
     def _reward_target_orientation(self):
         # Penalize non flat base orientation
         standup  = self.root_states[:, 2] > self.cfg.rewards.target_base_height_phase3
-        return torch.exp(torch.sum(torch.square(self.projected_gravity[:, :2]), dim=1) * -5) * standup
+        reward = torch.exp(torch.sum(torch.square(self.projected_gravity[:, :2]), dim=1) * -5) * standup
+        print(f"[REWARD] _reward_target_orientation: mean={reward.mean():.4f}, max={reward.max():.4f}, min={reward.min():.4f}")
+        return reward
     def _reward_target_base_height(self):
         # Penalize base height away from target
         base_height = self.root_states[:, 2]
         standup  = self.root_states[:, 2] > self.cfg.rewards.target_base_height_phase3
-        return torch.exp(torch.abs(base_height - self.cfg.rewards.base_height_target) * - 20) * standup
+        reward = torch.exp(torch.abs(base_height - self.cfg.rewards.base_height_target) * -20) * standup
+        print(f"[REWARD] _reward_target_base_height: mean={reward.mean():.4f}, max={reward.max():.4f}, min={reward.min():.4f}")
+        return reward
     def _reward_target_lower_dof_pos(self):
         mse = torch.sum(torch.square(self.dof_pos[:, :] - self.target_dof_pos[:, :]), dim=-1)
         standup =self.root_states[:, 2] > self.cfg.rewards.target_base_height_phase3
-        reward = torch.exp(mse * self.cfg.rewards.target_dof_pos_sigma) 
+        reward = torch.exp(mse * self.cfg.rewards.target_dof_pos_sigma)
         reward = reward * standup
+        print(f"[REWARD] _reward_target_lower_dof_pos: reward mean={reward.mean():.4f}, max={reward.max():.4f}, min={reward.min():.4f}")
+        print(f"[REWARD] _reward_target_lower_dof_pos: standup activated={standup.float().mean():.4f}, max={standup.float().max():.1f}, min={standup.float().min():.1f}")
         return reward
     def _reward_target_upper_dof_pos(self):
         # if self.is_gaussian:
@@ -1517,6 +1573,8 @@ class LeggedRobot_Zq(BaseTask):
         standup =self.root_states[:, 2] > self.cfg.rewards.target_base_height_phase3
         reward = torch.exp(mse * self.cfg.rewards.target_dof_pos_sigma) 
         reward = reward * standup
+        print(f"[REWARD] _reward_target_upper_dof_pos: reward mean={reward.mean():.4f}, max={reward.max():.4f}, min={reward.min():.4f}")
+        print(f"[REWARD] _reward_target_upper_dof_pos: standup activated={standup.float().mean():.4f}, max={standup.float().max():.1f}, min={standup.float().min():.1f}")
         return reward
     
     def _reward_target_feet_stumble(self):
@@ -1525,11 +1583,17 @@ class LeggedRobot_Zq(BaseTask):
         base_height = self.root_states[:, 2] > self.cfg.rewards.target_base_height_phase1
 
         reward = reward * base_height
+        print(f"[REWARD] _reward_target_feet_stumble: reward mean={reward.mean():.4f}, max={reward.max():.4f}, min={reward.min():.4f}")
+        print(f"[REWARD] _reward_target_feet_stumble: base_height activated={base_height.float().mean():.4f}, max={base_height.float().max():.1f}, min={base_height.float().min():.1f}")
         return reward
     
     def _reward_target_knee_angle(self):
         knee_angles = self.dof_pos[:, self.knee_joint_indices]
         reward = torch.all(knee_angles > 0, dim=1).float()
         standup = self.root_states[:, 2] > self.cfg.rewards.target_base_height_phase3
-        return reward * standup
+        reward = reward * standup
+
+        print(f"[REWARD] _reward_target_knee_angle: reward mean={reward.mean():.4f}, max={reward.max():.4f}, min={reward.min():.4f}")
+        print(f"[REWARD] _reward_target_knee_angle: standup activated={standup.float().mean():.4f}, max={standup.float().max():.1f}, min={standup.float().min():.1f}")
+        return reward
         
