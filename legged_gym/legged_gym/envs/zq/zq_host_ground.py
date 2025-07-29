@@ -114,12 +114,21 @@ class LeggedRobot_Zq(BaseTask):
         """
         clip_actions = self.cfg.normalization.clip_actions
         self.actions = torch.clip(actions, -clip_actions, clip_actions).to(self.device)
+        if torch.isnan(actions).any() or actions.abs().max() > 10:
+            print(f"[ERROR][step-input] Abnormal raw actions: min={actions.min().item()}, max={actions.max().item()}")
+        if torch.isnan(self.actions).any() or self.actions.abs().max() > 10:
+            print(f"[ERROR][step-clipped] Abnormal clipped actions: min={self.actions.min().item()}, max={self.actions.max().item()}")
+
         # step physics and render each frame
         self.render()
 
         for _ in range(self.cfg.control.decimation):
-            self.actions *= self.real_episode_length_buf.unsqueeze(1) > self.unactuated_time 
+            self.actions *= self.real_episode_length_buf.unsqueeze(1) > self.unactuated_time
+            if self.actions.abs().max() > 10 or torch.isnan(self.actions).any():
+                print(f"[ERROR][step-masked] Masked actions abnormal: max={self.actions.abs().max().item()}")
             self.torques = self._compute_torques(self.actions).view(self.torques.shape)
+            if torch.isnan(self.torques).any() or self.torques.abs().max() > 1000:
+                print(f"[ERROR][step-torques] Abnormal torques: min={self.torques.min().item()}, max={self.torques.max().item()}")
 
             self.gym.set_dof_actuation_force_tensor(self.sim, gymtorch.unwrap_tensor(self.torques))
             self.gym.simulate(self.sim)
@@ -629,6 +638,27 @@ class LeggedRobot_Zq(BaseTask):
         # print('torques1',torques)
         torques = self.motor_strength *  torques + self.actuation_offset
         # print('torques',torques)
+        # ================= 异常值检测 & 定向打印 =================
+        # 条件：dof_vel 或 torques 出现异常大值，打印对应 env_id 的数据
+        dof_vel_abs = self.dof_vel.abs().max(dim=1).values  # [num_envs]
+        torque_abs = torques.abs().max(dim=1).values        # [num_envs]
+
+        threshold_vel = 1000.0
+        threshold_torque = 1000.0
+
+        abnormal_envs = torch.nonzero((dof_vel_abs > threshold_vel) | (torque_abs > threshold_torque)).squeeze(-1)
+
+        if len(abnormal_envs) > 0:
+            print("=" * 60)
+            print(f"[DEBUG][compute_torques] ⚠️ Abnormal envs detected: {abnormal_envs.tolist()}")
+            for eid in abnormal_envs.tolist():
+                print(f"--- Env {eid} ---")
+                print("  → actions_scaled:", actions_scaled[eid].cpu().numpy())
+                print("  → dof_pos:", self.dof_pos[eid].cpu().numpy())
+                print("  → dof_vel:", self.dof_vel[eid].cpu().numpy())
+                print("  → joint_pos_target:", self.joint_pos_target[eid].cpu().numpy())
+                print("  → torques:", torques[eid].cpu().numpy())
+            print("=" * 60)
 
         return torch.clip(torques, -self.torque_limits, self.torque_limits)
 
