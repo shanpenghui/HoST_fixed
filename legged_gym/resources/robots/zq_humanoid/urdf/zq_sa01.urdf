@@ -7,7 +7,7 @@ Stephen Brawner (brawner@gmail.com)
   name="zqsa01">
 
   <mujoco>
-    <compiler meshdir="../meshes/" />
+    <compiler meshdir="../meshes/"  balanceinertia="true" discardvisual="false"/>
   </mujoco>
 
   <link
@@ -53,30 +53,6 @@ Stephen Brawner (brawner@gmail.com)
       </geometry>
     </collision>
   </link>
-
-     <!-- Keyframe -->
-  	<link name="keyframe_head_link">
-  		<!-- <visual>
-  		<origin xyz="0 0 0" rpy="0 0 0"/>
-  		<geometry>
-  			<sphere radius="0.05"/>
-  		</geometry>
-  		</visual> -->
-  		<visual>
-  			<geometry>
-  			<!-- 定义几何形状，例如盒子 -->
-  			<box size="0.01 0.01 0.01"/>
-  			</geometry>
-  			<material name="white">
-  			<color rgba="1.7 0.7 0.7 1"/>
-  			</material>
-  		</visual>
-  	</link>
-  	<joint name="keyframe_head_joint" type="fixed" dont_collapse="true">
-  		<origin xyz="0 0 0.08" rpy="0 0 0"/>
-  		<parent link="base_link"/>
-  		<child link="keyframe_head_link"/>
-  	</joint>
 
   <link
     name="leg_l1_link">
@@ -136,7 +112,7 @@ Stephen Brawner (brawner@gmail.com)
       upper="0.523"
       effort="140"
       velocity="25" />
-    <dynamics damping="2.0" friction="0.5"/>
+    <dynamics damping="0.0" friction="0.0"/>
   </joint>
 
   <link
@@ -197,7 +173,7 @@ Stephen Brawner (brawner@gmail.com)
       upper="0.3"
       effort="140"
       velocity="25" />
-    <dynamics damping="2.0" friction="0.5"/>
+    <dynamics damping="0.0" friction="0.0"/>
   </joint>
 
   <link
@@ -257,7 +233,7 @@ Stephen Brawner (brawner@gmail.com)
       upper="1.204"
       effort="140"
       velocity="25" />
-    <dynamics damping="2.0" friction="0.5"/>
+    <dynamics damping="0.0" friction="0.0"/>
   </joint>
 
   <link
@@ -317,7 +293,7 @@ Stephen Brawner (brawner@gmail.com)
       upper="2.268"
       effort="140"
       velocity="25" />
-    <dynamics damping="2.0" friction="0.5"/>
+    <dynamics damping="0.0" friction="0.0"/>
   </joint>
 
   <link
@@ -385,7 +361,7 @@ Stephen Brawner (brawner@gmail.com)
       upper="0.6"
       effort="24"
       velocity="31" />
-    <dynamics damping="2.0" friction="0.5"/>
+    <dynamics damping="0.0" friction="0.0"/>
   </joint>
 
   <link
@@ -427,6 +403,91 @@ Stephen Brawner (brawner@gmail.com)
       </material>
     </visual>
     <collision>
+    <origin xyz="0.195 0 -0.05" rpy="0 0 0"/>
+    <geometry>
+        <sphere radius="0.005"/>
+    </geometry>
+    </collision>
+
+    <collision>
+    <origin xyz="0.19 -0.03 -0.05" rpy="0 0 0"/>
+    <geometry>
+        <sphere radius="0.005"/>
+    </geometry>
+    </collision>
+
+    <collision>
+    <origin xyz="0.19 0.03 -0.05" rpy="0 0 0"/>
+    <geometry>
+        <sphere radius="0.005"/>
+    </geometry>
+    </collision>
+
+    <collision>
+    <origin xyz="0.17 -0.04 -0.05" rpy="0 0 0"/>
+    <geometry>
+        <sphere radius="0.005"/>
+    </geometry>
+    </collision>
+
+    <collision>
+    <origin xyz="0.16 0.05 -0.05" rpy="0 0 0"/>
+    <geometry>
+        <sphere radius="0.005"/>
+    </geometry>
+    </collision>
+
+    <collision>
+    <origin xyz="-0.065 -0.04 -0.05" rpy="0 0 0"/>
+    <geometry>
+        <sphere radius="0.005"/>
+    </geometry>
+    </collision>
+
+    <collision>
+    <origin xyz="-0.065 0.04 -0.05" rpy="0 0 0"/>
+    <geometry>
+        <!-- <box size="0.01 0.01 0.5"/> -->
+        <sphere radius="0.005"/>
+    </geometry>
+    </collision>
+
+    <collision>
+    <origin xyz="-0.075 0 -0.05" rpy="0 0 0"/>
+    <geometry>
+        <sphere radius="0.005"/>
+    </geometry>
+    </collision>
+
+    <collision>
+    <origin xyz="0 -0.045 -0.05" rpy="0 0 0"/>
+    <geometry>
+        <sphere radius="0.005"/>
+    </geometry>
+    </collision>
+
+    <collision>
+    <origin xyz="0.085 -0.045 -0.05" rpy="0 0 0"/>
+    <geometry>
+        <sphere radius="0.005"/>
+    </geometry>
+    </collision>
+
+    <collision>
+    <origin xyz="0 0.05 -0.05" rpy="0 0 0"/>
+    <geometry>
+        <sphere radius="0.005"/>
+    </geometry>
+    </collision>
+
+    <collision>
+    <origin xyz="0.085 0.055 -0.05" rpy="0 0 0"/>
+    <geometry>
+        <sphere radius="0.005"/>
+    </geometry>
+    </collision>
+
+    <collision>
       <origin
         xyz="0.0 0 -0.0"
         rpy="0 0 0" />
@@ -457,7 +518,7 @@ Stephen Brawner (brawner@gmail.com)
       upper="0.6"
       effort="24"
       velocity="31" />
-    <dynamics damping="2.0" friction="0.5"/>
+    <dynamics damping="0.0" friction="0.0"/>
   </joint>
 
   <link
@@ -518,7 +579,7 @@ Stephen Brawner (brawner@gmail.com)
       upper="0.523"
       effort="140"
       velocity="25" />
-    <dynamics damping="2.0" friction="0.5"/>
+    <dynamics damping="0.0" friction="0.0"/>
   </joint>
 
   <link
@@ -579,7 +640,7 @@ Stephen Brawner (brawner@gmail.com)
       upper="0.3"
       effort="140"
       velocity="25" />
-    <dynamics damping="2.0" friction="0.5"/>
+    <dynamics damping="0.0" friction="0.0"/>
   </joint>
 
   <link
@@ -639,7 +700,7 @@ Stephen Brawner (brawner@gmail.com)
       upper="1.204"
       effort="140"
       velocity="25" />
-    <dynamics damping="2.0" friction="0.5"/>
+    <dynamics damping="0.0" friction="0.0"/>
   </joint>
 
   <link
@@ -699,7 +760,7 @@ Stephen Brawner (brawner@gmail.com)
       upper="2.268"
       effort="140"
       velocity="25" />
-    <dynamics damping="2.0" friction="0.5"/>
+    <dynamics damping="0.0" friction="0.0"/>
   </joint>
 
   <link
@@ -767,7 +828,7 @@ Stephen Brawner (brawner@gmail.com)
       upper="0.6"
       effort="24"
       velocity="31" />
-    <dynamics damping="2.0" friction="0.5"/>
+    <dynamics damping="0.0" friction="0.0"/>
   </joint>
 
   <link
@@ -809,6 +870,91 @@ Stephen Brawner (brawner@gmail.com)
       </material>
     </visual>
     <collision>
+    <origin xyz="0.195 0 -0.05" rpy="0 0 0"/>
+    <geometry>
+        <sphere radius="0.005"/>
+    </geometry>
+    </collision>
+
+    <collision>
+    <origin xyz="0.19 -0.03 -0.05" rpy="0 0 0"/>
+    <geometry>
+        <sphere radius="0.005"/>
+    </geometry>
+    </collision>
+
+    <collision>
+    <origin xyz="0.19 0.03 -0.05" rpy="0 0 0"/>
+    <geometry>
+        <sphere radius="0.005"/>
+    </geometry>
+    </collision>
+
+    <collision>
+    <origin xyz="0.155 -0.05 -0.05" rpy="0 0 0"/>
+    <geometry>
+        <sphere radius="0.005"/>
+    </geometry>
+    </collision>
+
+    <collision>
+    <origin xyz="0.16 0.04 -0.05" rpy="0 0 0"/>
+    <geometry>
+        <sphere radius="0.005"/>
+    </geometry>
+    </collision>
+
+    <collision>
+    <origin xyz="-0.065 -0.04 -0.05" rpy="0 0 0"/>
+    <geometry>
+        <sphere radius="0.005"/>
+    </geometry>
+    </collision>
+
+    <collision>
+    <origin xyz="-0.065 0.04 -0.05" rpy="0 0 0"/>
+    <geometry>
+        <!-- <box size="0.01 0.01 0.5"/> -->
+        <sphere radius="0.005"/>
+    </geometry>
+    </collision>
+
+    <collision>
+    <origin xyz="-0.075 0 -0.05" rpy="0 0 0"/>
+    <geometry>
+        <sphere radius="0.005"/>
+    </geometry>
+    </collision>
+
+    <collision>
+    <origin xyz="0 -0.05 -0.05" rpy="0 0 0"/>
+    <geometry>
+        <sphere radius="0.005"/>
+    </geometry>
+    </collision>
+
+    <collision>
+    <origin xyz="0.085 -0.055 -0.05" rpy="0 0 0"/>
+    <geometry>
+        <sphere radius="0.005"/>
+    </geometry>
+    </collision>
+
+    <collision>
+    <origin xyz="0 0.045 -0.05" rpy="0 0 0"/>
+    <geometry>
+        <sphere radius="0.005"/>
+    </geometry>
+    </collision>
+
+    <collision>
+    <origin xyz="0.085 0.045 -0.05" rpy="0 0 0"/>
+    <geometry>
+        <sphere radius="0.005"/>
+    </geometry>
+    </collision>
+
+    <collision>
       <origin
         xyz="0.0 0 -0.0"
         rpy="0 0 0" />
@@ -839,6 +985,140 @@ Stephen Brawner (brawner@gmail.com)
       upper="0.6"
       effort="24"
       velocity="31" />
-    <dynamics damping="2.0" friction="0.5"/>
+    <dynamics damping="0.0" friction="0.0"/>
   </joint>
+
+   <!-- Keyframe -->
+	<link name="keyframe_head_link">
+		<visual>
+			<geometry>
+			<!-- 定义几何形状，例如盒子 -->
+			<box size="0.01 0.01 0.01"/>
+			</geometry>
+			<material name="white">
+			<color rgba="1.7 0.7 0.7 1"/>
+			</material>
+		</visual>
+	</link>
+	<joint name="keyframe_head_joint" type="fixed" dont_collapse="true">
+		<origin xyz="0 0 0.4" rpy="0 0 0"/>
+		<parent link="base_link"/>
+		<child link="keyframe_head_link"/>
+	</joint>
+
+	<!-- Auxiliary -->
+	<link name="auxiliary_r_ankle_roll_link1">
+		<visual>
+		<origin xyz="0 0 0" rpy="0 0 0"/>
+		<geometry>
+			<sphere radius="0.01"/>
+		</geometry>
+		</visual>
+	</link>
+	<joint name="auxiliary_r_ankle_roll_joint1" type="fixed" dont_collapse="true">
+		<origin xyz="0.05 -0.08 -0.045" rpy="0 0 0"/>
+		<parent link="leg_r6_link"/>
+		<child link="auxiliary_r_ankle_roll_link1"/>
+	</joint>
+
+	<link name="auxiliary_r_ankle_roll_link2">
+		<visual>
+		<origin xyz="0 0 0" rpy="0 0 0"/>
+		<geometry>
+			<sphere radius="0.01"/>
+		</geometry>
+		</visual>
+	</link>
+	<joint name="auxiliary_r_ankle_roll_joint2" type="fixed" dont_collapse="true">
+		<origin xyz="0.05 0.07 -0.045" rpy="0 0 0"/>
+		<parent link="leg_r6_link"/>
+		<child link="auxiliary_r_ankle_roll_link2"/>
+	</joint>
+
+    <link name="auxiliary_r_ankle_roll_link3">
+        <visual>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry>
+            <sphere radius="0.01"/>
+        </geometry>
+        </visual>
+    </link>
+    <joint name="auxiliary_r_ankle_roll_joint3" type="fixed" dont_collapse="true">
+        <origin xyz="0.23 0 -0.045" rpy="0 0 0"/>
+        <parent link="leg_r6_link"/>
+        <child link="auxiliary_r_ankle_roll_link3"/>
+    </joint>
+
+    <link name="auxiliary_r_ankle_roll_link4">
+        <visual>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry>
+            <sphere radius="0.01"/>
+        </geometry>
+        </visual>
+    </link>
+    <joint name="auxiliary_r_ankle_roll_joint4" type="fixed" dont_collapse="true">
+        <origin xyz="-0.11 0 -0.045" rpy="0 0 0"/>
+        <parent link="leg_r6_link"/>
+        <child link="auxiliary_r_ankle_roll_link4"/>
+    </joint>
+
+
+
+    <link name="auxiliary_l_ankle_roll_link1">
+        <visual>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry>
+            <sphere radius="0.01"/>
+        </geometry>
+        </visual>
+    </link>
+    <joint name="auxiliary_l_ankle_roll_joint1" type="fixed" dont_collapse="true">
+        <origin xyz="0.05 -0.07 -0.045" rpy="0 0 0"/>
+        <parent link="leg_l6_link"/>
+        <child link="auxiliary_l_ankle_roll_link1"/>
+    </joint>
+
+    <link name="auxiliary_l_ankle_roll_link2">
+        <visual>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry>
+            <sphere radius="0.01"/>
+        </geometry>
+        </visual>
+    </link>
+    <joint name="auxiliary_l_ankle_roll_joint2" type="fixed" dont_collapse="true">
+        <origin xyz="0.05 0.08 -0.045" rpy="0 0 0"/>
+        <parent link="leg_l6_link"/>
+        <child link="auxiliary_l_ankle_roll_link2"/>
+    </joint>
+
+    <link name="auxiliary_l_ankle_roll_link3">
+        <visual>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry>
+            <sphere radius="0.01"/>
+        </geometry>
+        </visual>
+    </link>
+    <joint name="auxiliary_l_ankle_roll_joint3" type="fixed" dont_collapse="true">
+        <origin xyz="0.23 0 -0.045" rpy="0 0 0"/>
+        <parent link="leg_l6_link"/>
+        <child link="auxiliary_l_ankle_roll_link3"/>
+    </joint>
+
+    <link name="auxiliary_l_ankle_roll_link4">
+        <visual>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry>
+            <sphere radius="0.01"/>
+        </geometry>
+        </visual>
+    </link>
+    <joint name="auxiliary_l_ankle_roll_joint4" type="fixed" dont_collapse="true">
+        <origin xyz="-0.11 0 -0.045" rpy="0 0 0"/>
+        <parent link="leg_l6_link"/>
+        <child link="auxiliary_l_ankle_roll_link4"/>
+    </joint>
+
 </robot>

@@ -187,8 +187,8 @@ class ZqCfg( LeggedRobotCfg ):
 
     class constraints( LeggedRobotCfg.rewards ):
         is_gaussian = True
-        target_head_height = 0.907
-        target_head_margin = 0.907
+        target_head_height = 1
+        target_head_margin = 1
         orientation_height_threshold = 0.9
         target_base_height = 0.45  # 参考宇树G1 # updated to match Piwaist
 
@@ -281,10 +281,10 @@ class ZqCfg( LeggedRobotCfg ):
         # 在 base link 上向上施加一个垂直辅助力，模拟“托起”动作；随着训练进行，逐渐减小，最终为 0
         # Unitree G1 的训练中用了 F = 200N 而代码中实际设置的是 force=100，是因为该项目结构中 力同时施加在两个 link 上（torso+base）→ 总力=100×2=200
         # 如果代码结构是双 link 同时施力（如 torso + base），你应将 force 设置为总力一半（如 force = 50 → 实际 100N）
-        force = 200 # 100*2=200 is the actuatl force because of a extra keyframe torso link
+        force = 100 # 100*2=200 is the actuatl force because of a extra keyframe torso link
         dof_vel_limit = 300
         base_vel_limit = 20
-        threshold_height = 0.9 # 参考宇树G1
+        threshold_height = 0.8 # 参考宇树G1
         no_orientation = True  # 参考宇树G1
 
     class sim:
